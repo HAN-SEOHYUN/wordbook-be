@@ -1,0 +1,45 @@
+========================
+
+Python 관련 무시 파일
+
+========================
+
+pycache/
+*.pyc
+*.pyd
+*.so
+.python-version
+venv/
+env/
+.env/
+
+IDE/에디터 관련 무시 파일 (선택 사항)
+
+VS Code
+
+.vscode/
+
+PyCharm
+
+.idea/
+
+========================
+
+민감 정보 및 데이터 파일 무시
+
+========================
+
+DB 접속 정보가 포함된 환경 변수 파일
+
+.env
+.env.dev
+.env.local
+
+SQLite DB 파일 (혹시 모를 경우 대비)
+
+*.sqlite
+*.sqlite3
+
+로그 파일
+
+*.log
