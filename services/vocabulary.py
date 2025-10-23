@@ -44,24 +44,26 @@ class VocabularyService:
                 )
             return VocabularyResponse.model_validate(db_word)
 
+    # --- [수정 완료: target_date를 앞으로 이동] ---
     def get_word_list(
-        self, limit: int = 100, offset: int = 0, target_date: Optional[str] = None
+        self, target_date: str, limit: int = 100, offset: int = 0
     ) -> List[VocabularyResponse]:
-        """단어 목록을 조회합니다. 날짜 필터링을 지원합니다."""
+        """
+        단어 목록을 조회합니다. target_date가 필수입니다.
+        """
 
         # 날짜 포맷 유효성 검사
-        if target_date:
-            try:
-                validate_date_format(target_date)
-            except ValueError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-                )
+        try:
+            validate_date_format(target_date)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
         with self.db.get_connection() as conn:
             db_words = crud_voca.get_words(conn, limit, offset, target_date)
 
             return [VocabularyResponse.model_validate(word) for word in db_words]
+
+    # --- [수정 완료] ---
 
     def update_word(
         self, word_id: int, word_data: VocabularyUpdate

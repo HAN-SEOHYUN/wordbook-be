@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, status
-from typing import List, Optional, Dict
+from typing import List, Dict
 from core.database import DatabaseManager
 from services.vocabulary import VocabularyService
 from schemas.vocabulary import VocabularyCreate, VocabularyUpdate, VocabularyResponse
@@ -43,7 +43,7 @@ def create_vocabulary(
     """
     새로운 단어를 생성합니다. (date, english_word)가 중복될 경우 기존 레코드를 업데이트(UPSERT)합니다.
     """
-    return service.create_or_update_word(word_data)
+    return service.create_or_or_update_word(word_data)
 
 
 @router.get(
@@ -63,20 +63,24 @@ def get_vocabulary_by_id(
     "/", response_model=List[VocabularyResponse], summary="Get List of Vocabulary Items"
 )
 def get_vocabulary_list(
-    # 쿼리 파라미터 정의
+    # --- [수정 사항 1: target_date 필수 및 순서 변경] ---
+    # Optional 제거, 기본값 제거, ... 를 사용하여 필수로 지정
+    target_date: str = Query(..., description="필수: 조회할 날짜 (YYYY-MM-DD)"),
+    # 쿼리 파라미터 정의 (기본값이 있는 인자)
     limit: int = Query(
         100, ge=1, le=500, description="Maximum number of items to return"
     ),
     offset: int = Query(0, ge=0, description="Number of items to skip"),
-    target_date: Optional[str] = Query(
-        None, description="Filter by specific date (YYYY-MM-DD)"
-    ),
+    # --- [수정 사항 1 끝] ---
     service: VocabularyService = Depends(get_vocabulary_service),
 ):
     """
     단어 목록을 조회합니다. 날짜 필터링, 페이징(limit/offset)을 지원합니다.
     """
-    return service.get_word_list(limit, offset, target_date)
+    # --- [수정 사항 2: 서비스 호출 인자 순서 변경] ---
+    # Service layer: get_word_list(self, target_date: str, limit: int = 100, offset: int = 0) 순서에 맞춤
+    return service.get_word_list(target_date, limit, offset)
+    # --- [수정 사항 2 끝] ---
 
 
 @router.put(
