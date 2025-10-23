@@ -129,3 +129,23 @@ def delete_word(conn: Connection, word_id: int) -> bool:
     except Exception as e:
         conn.rollback()
         raise e
+
+
+def get_distinct_dates(conn, limit: int = 5):
+    """
+    데이터베이스에서 고유한 날짜 목록을 최신순으로 조회합니다.
+    """
+    cursor = conn.cursor()
+
+    query = f"""
+        SELECT DISTINCT date 
+        FROM {TABLE_NAME}
+        ORDER BY date DESC 
+        LIMIT %s
+    """
+
+    cursor.execute(query, (limit,))
+    rows = cursor.fetchall()
+
+    # 각 row에서 날짜만 추출하여 반환
+    return rows

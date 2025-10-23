@@ -30,6 +30,21 @@ def get_vocabulary_service(
 # --- CRUD Endpoints ---
 
 
+# ⭐ 중요: 구체적인 경로(/dates)를 먼저 정의해야 합니다!
+@router.get(
+    "/dates",
+    response_model=List[str],
+    summary="Get List of Available Dates (Max 5, Newest First)",
+)
+def get_available_dates(
+    service: VocabularyService = Depends(get_vocabulary_service),
+):
+    """
+    데이터베이스에 저장된 고유한 단어 추출 날짜 목록을 최신순으로 최대 5개 조회합니다.
+    """
+    return service.get_distinct_dates()
+
+
 @router.post(
     "/",
     response_model=VocabularyResponse,
@@ -43,7 +58,27 @@ def create_vocabulary(
     """
     새로운 단어를 생성합니다. (date, english_word)가 중복될 경우 기존 레코드를 업데이트(UPSERT)합니다.
     """
-    return service.create_or_or_update_word(word_data)
+    return service.create_or_update_word(word_data)
+
+
+@router.get(
+    "/", response_model=List[VocabularyResponse], summary="Get List of Vocabulary Items"
+)
+def get_vocabulary_list(
+    # target_date를 필수 쿼리 파라미터로 지정
+    target_date: str = Query(..., description="필수: 조회할 날짜 (YYYY-MM-DD)"),
+    # 쿼리 파라미터 정의 (기본값이 있는 인자)
+    limit: int = Query(
+        100, ge=1, le=500, description="Maximum number of items to return"
+    ),
+    offset: int = Query(0, ge=0, description="Number of items to skip"),
+    service: VocabularyService = Depends(get_vocabulary_service),
+):
+    """
+    단어 목록을 조회합니다. 날짜 필터링, 페이징(limit/offset)을 지원합니다.
+    """
+    # Service layer: get_word_list(self, target_date: str, limit: int = 100, offset: int = 0) 순서에 맞춤
+    return service.get_word_list(target_date, limit, offset)
 
 
 @router.get(
@@ -57,30 +92,6 @@ def get_vocabulary_by_id(
 ):
     """특정 ID를 가진 단어 정보를 조회합니다."""
     return service.get_word(word_id)
-
-
-@router.get(
-    "/", response_model=List[VocabularyResponse], summary="Get List of Vocabulary Items"
-)
-def get_vocabulary_list(
-    # --- [수정 사항 1: target_date 필수 및 순서 변경] ---
-    # Optional 제거, 기본값 제거, ... 를 사용하여 필수로 지정
-    target_date: str = Query(..., description="필수: 조회할 날짜 (YYYY-MM-DD)"),
-    # 쿼리 파라미터 정의 (기본값이 있는 인자)
-    limit: int = Query(
-        100, ge=1, le=500, description="Maximum number of items to return"
-    ),
-    offset: int = Query(0, ge=0, description="Number of items to skip"),
-    # --- [수정 사항 1 끝] ---
-    service: VocabularyService = Depends(get_vocabulary_service),
-):
-    """
-    단어 목록을 조회합니다. 날짜 필터링, 페이징(limit/offset)을 지원합니다.
-    """
-    # --- [수정 사항 2: 서비스 호출 인자 순서 변경] ---
-    # Service layer: get_word_list(self, target_date: str, limit: int = 100, offset: int = 0) 순서에 맞춤
-    return service.get_word_list(target_date, limit, offset)
-    # --- [수정 사항 2 끝] ---
 
 
 @router.put(

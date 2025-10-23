@@ -1,23 +1,38 @@
-import logging
 from fastapi import FastAPI
-from dotenv import load_dotenv
-import os
+from fastapi.middleware.cors import CORSMiddleware
 
-# 환경 변수 로드 (DatabaseManager 초기화에 필요)
-# Note: 실제 프로젝트 환경에 따라 .env.dev, .env.prod 등 적절한 파일을 로드해야 함
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env.dev"))
+# 1. api/routers/vocabulary.py 파일에서 router 객체를 가져옵니다.
+from api.routers.vocabulary import router as vocabulary_router
 
-from api.routers import vocabulary as vocabulary_router
-
-# 로깅 설정
-logging.basicConfig(level=logging.INFO)
-
-# FastAPI 애플리케이션 생성
+# FastAPI 애플리케이션 초기화
 app = FastAPI(
-    title="Wordbook API",
-    description="일일 어휘 크롤링 및 관리 서비스 API",
+    title="Vocabulary API",
+    description="일일 영단어 및 구문 관리 시스템 API",
     version="1.0.0",
 )
 
-# API 라우터 등록 및 /api/v1 프리픽스 추가
-app.include_router(vocabulary_router.router, prefix="/api/v1")
+# CORS 설정 추가 (라우터보다 먼저!)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://192.168.0.65:3000",  # Network 주소
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 2. 라우터 객체를 메인 애플리케이션에 등록합니다.
+# '/api/v1' 프리픽스를 사용하여 모든 엔드포인트 URL 앞에 붙여줍니다.
+app.include_router(vocabulary_router, prefix="/api/v1")
+
+
+@app.get("/", tags=["Root"])
+def read_root():
+    return {"message": "Welcome to the Vocabulary API"}
+
+
+# 기타 설정 (DB 초기화, 이벤트 핸들러 등...)
+# ...

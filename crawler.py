@@ -1,189 +1,214 @@
-import requests
-import re
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-import pymysql
-import pymysql.cursors
-from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
+import re
+import time
 import logging
-import os
-from dotenv import load_dotenv  # 환경 변수 로드를 위해 필요
-from typing import List, Tuple
+import requests
 
 # 로깅 설정
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="[%(asctime)s] %(levelname)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
+logger = logging.getLogger(__name__)
 
 
-# --- DB 연결 및 관리 클래스 (사용자 제공) ---
-class DatabaseManager:
-    """환경 변수를 통해 MySQL 연결 정보를 관리하고 커넥션을 제공하는 클래스입니다."""
+class EBSMorningCrawler:
+    """EBS 모닝스페셜 영단어 크롤러"""
 
-    def __init__(self):
-        # 환경 변수 로드 (스크립트 실행 시 .env 파일이 존재하는 경우)
-        load_dotenv(".env.dev")
+    BASE_URL = "https://home.ebs.co.kr"
+    BOARD_URL = "https://home.ebs.co.kr/morning/board/6/502387/list?hmpMnuId=101"
+    BODY_SELECTOR = "div.con_txt"
 
-        try:
-            # 1. DB_HOST (필수)
-            self.host = os.environ["DB_HOST"]
-            # 3. DB_USER (필수)
-            self.user = os.environ["DB_USER"]
-            # 4. DB_PASSWORD (필수)
-            self.password = os.environ["DB_PASSWORD"]
-            # 5. DB_DATABASE (필수)
-            self.database = os.environ["DB_DATABASE"]
-        except KeyError as e:
-            logging.error(
-                f"필수 환경 변수 {e}가 설정되지 않았습니다. .env.dev 파일을 확인하세요."
-            )
-            raise
-
-        # 2. DB_PORT (기본값: 3306)
-        try:
-            port_str = os.getenv("DB_PORT", "3306")
-            self.port = int(port_str)
-        except ValueError:
-            logging.error(
-                f"DB_PORT 환경 변수({port_str})가 유효한 숫자가 아닙니다. 3306을 사용합니다."
-            )
-            self.port = 3306
-
-        logging.info("DatabaseManager 초기화 완료.")
-
-    @contextmanager
-    def get_connection(self):
-        """MySQL 연결을 생성하고 관리하는 컨텍스트 매니저입니다."""
-        connection = None
-        try:
-            connection = pymysql.connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password,
-                database=self.database,
-                charset="utf8mb4",
-                cursorclass=pymysql.cursors.DictCursor,
-                autocommit=False,
-                init_command="SET time_zone='+09:00'",
-            )
-            yield connection
-        except Exception as e:
-            if connection:
-                connection.rollback()
-            logging.error(f"Database error: {e}")
-            # 에러를 재발생시켜 호출자에게 알립니다.
-            raise
-        finally:
-            if connection:
-                connection.close()
-
-
-# --- 크롤링 및 정규 표현식 설정 ---
-ARTICLE_URL = "https://home.ebs.co.kr/morning/board/6/502387/view/30000321510?c.page=1"
-BODY_SELECTOR = "div.con_txt"
-
-WORD_PATTERN = re.compile(r"▶\s*(.*?)\s*:\s*(.*?)(?=\s*▶|\Z)", re.DOTALL)
-NON_BULLET_WORD_PATTERN = re.compile(
-    r"([a-zA-Z\s\-\/]+?):\s*(.*?)(?=\s*▶|\s*[a-zA-Z\s\-\/]+?:|\Z)", re.DOTALL
-)
-
-
-# --- 크롤링 핵심 로직 함수 (이전 단계 검증 완료된 코드) ---
-
-
-def clean_korean_translation(raw_kor: str, log_prefix: str, final_matches: list) -> str:
-    """
-    한글 해석 문자열에서 불필요하게 섞여 들어간 기사 본문 및 다른 어휘 항목을 제거하고,
-    분리되어야 하는 어휘 항목(relieve oneself)을 별도로 추출합니다.
-    """
-    clean_kor = raw_kor
-
-    # 1. 분리되어야 하는 어휘 항목('relieve oneself') 처리
-    relieve_pattern = r"relieve oneself\[nature\]\s*:\s*대소변을 보다"
-    relieve_match = re.search(relieve_pattern, clean_kor, re.DOTALL | re.IGNORECASE)
-
-    if relieve_match:
-        relieve_entry_text = relieve_match.group(0).strip()
-        relieve_parts = relieve_entry_text.split(":")
-
-        if len(relieve_parts) == 2:
-            relieve_eng = relieve_parts[0].strip().replace("[nature]", "").strip()
-            relieve_kor = relieve_parts[1].strip()
-            final_matches.append((relieve_eng, relieve_kor))
-            logging.debug(f"{log_prefix} [Clean] Extracted and Cut 'relieve oneself'.")
-
-        # 기존 단어의 한글 해석은 'relieve oneself' 앞에서 자른다.
-        cut_index = relieve_match.start()
-        clean_kor = clean_kor[:cut_index].strip()
-
-    # 2. 다음 뉴스 기사 번호 시작 패턴 (예: "2. Seoul...")을 찾고 그 앞에서 자른다.
-    news_body_start_match = re.search(
-        r"\s*\d+\.\s*([A-Z]|\s*서울시는|\s*영국|\s*미국의)", clean_kor, re.DOTALL
+    # 정규표현식 패턴
+    WORD_PATTERN = re.compile(r"▶\s*(.*?)\s*:\s*(.*?)(?=\s*▶|\Z)", re.DOTALL)
+    NON_BULLET_WORD_PATTERN = re.compile(
+        r"([a-zA-Z\s\-\/]+?):\s*(.*?)(?=\s*▶|\s*[a-zA-Z\s\-\/]+?:|\Z)", re.DOTALL
     )
 
-    if news_body_start_match:
-        cut_index = news_body_start_match.start()
-        clean_kor = clean_kor[:cut_index].strip()
-        logging.debug(
-            f"{log_prefix} [Clean] Cut at News Item Start (Index {cut_index})"
+    def __init__(self, headless=True):
+        chrome_options = Options()
+        if headless:
+            chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument(
+            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
 
-    # 3. 'Expression' 마커를 찾고 그 앞에서 자른다.
-    expression_marker = "Expression"
-    if expression_marker in clean_kor:
-        cut_index = clean_kor.find(expression_marker)
-        clean_kor = clean_kor[:cut_index].strip()
-        logging.debug(
-            f"{log_prefix} [Clean] Cut at Expression Marker (Index {cut_index})"
+        service = Service(ChromeDriverManager().install())
+        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        self.wait = WebDriverWait(self.driver, 10)
+
+    def get_yesterday_date(self):
+        """어제 날짜 계산"""
+        yesterday = datetime.now() - timedelta(days=1)
+        display_format = yesterday.strftime("%Y.%m.%d")
+        db_format = yesterday.strftime("%Y-%m-%d")
+        return display_format, db_format
+
+    def find_article_by_date(self, target_date):
+        """게시판에서 특정 날짜의 게시글 찾기"""
+        try:
+            logger.info(f"게시판 페이지 접속 중...")
+            self.driver.get(self.BOARD_URL)
+
+            # 게시글 목록이 로드될 때까지 대기
+            self.wait.until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "#itemList > tr"))
+            )
+            logger.info("페이지 로드 완료")
+
+            # 게시글 목록 가져오기 (공지사항 제외)
+            rows = self.driver.find_elements(
+                By.CSS_SELECTOR, "#itemList > tr:not(.notice)"
+            )
+            logger.info(f"총 {len(rows)}개의 일반 게시글 발견")
+
+            for idx, row in enumerate(rows, 1):
+                try:
+                    tds = row.find_elements(By.TAG_NAME, "td")
+
+                    if len(tds) < 5:
+                        continue
+
+                    # 날짜는 4번째 td (인덱스 3)
+                    date_text = tds[3].text.strip()
+
+                    if date_text == target_date:
+                        # 제목 컬럼에서 링크 추출
+                        link_element = tds[1].find_element(By.TAG_NAME, "a")
+                        href = link_element.get_attribute("href")
+
+                        if href.startswith("/"):
+                            full_url = self.BASE_URL + href
+                        else:
+                            full_url = href
+
+                        title = link_element.text.strip()
+                        logger.info(f"✓ 발견: {title}")
+                        logger.info(f"  URL: {full_url}")
+
+                        return full_url
+
+                except Exception as e:
+                    logger.debug(f"게시글 {idx} 처리 중 에러: {e}")
+                    continue
+
+            logger.warning(f"{target_date} 날짜의 게시글을 찾을 수 없습니다.")
+            return None
+
+        except Exception as e:
+            logger.error(f"게시판 조회 중 에러 발생: {e}")
+            return None
+
+    def clean_korean_translation(
+        self, raw_kor: str, log_prefix: str, final_matches: list
+    ) -> str:
+        """
+        한글 해석 문자열에서 불필요하게 섞여 들어간 기사 본문 및 다른 어휘 항목을 제거
+        """
+        clean_kor = raw_kor
+
+        # 1. 'relieve oneself' 항목 처리
+        relieve_pattern = r"relieve oneself\[nature\]\s*:\s*대소변을 보다"
+        relieve_match = re.search(relieve_pattern, clean_kor, re.DOTALL | re.IGNORECASE)
+
+        if relieve_match:
+            relieve_entry_text = relieve_match.group(0).strip()
+            relieve_parts = relieve_entry_text.split(":")
+
+            if len(relieve_parts) == 2:
+                relieve_eng = relieve_parts[0].strip().replace("[nature]", "").strip()
+                relieve_kor = relieve_parts[1].strip()
+                final_matches.append((relieve_eng, relieve_kor))
+                logger.debug(f"{log_prefix} [Clean] Extracted 'relieve oneself'.")
+
+            cut_index = relieve_match.start()
+            clean_kor = clean_kor[:cut_index].strip()
+
+        # 2. 다음 뉴스 기사 번호 시작 패턴
+        news_body_start_match = re.search(
+            r"\s*\d+\.\s*([A-Z]|\s*서울시는|\s*영국|\s*미국의)", clean_kor, re.DOTALL
         )
 
-    return clean_kor.strip()
+        if news_body_start_match:
+            cut_index = news_body_start_match.start()
+            clean_kor = clean_kor[:cut_index].strip()
+            logger.debug(f"{log_prefix} [Clean] Cut at News Item Start")
 
+        # 3. 'Expression' 마커
+        expression_marker = "Expression"
+        if expression_marker in clean_kor:
+            cut_index = clean_kor.find(expression_marker)
+            clean_kor = clean_kor[:cut_index].strip()
+            logger.debug(f"{log_prefix} [Clean] Cut at Expression Marker")
 
-def fetch_and_extract_body(url: str, selector: str) -> List[Tuple[str, str]]:
-    """
-    URL에서 본문을 추출하고 정리된 영단어-한글 해석 쌍 리스트를 반환합니다.
-    """
-    logging.info("--- [1/3] 웹 페이지 요청 및 텍스트 추출 시작 ---")
-    final_matches = []
+        return clean_kor.strip()
 
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, "lxml")
+    def extract_vocabulary(self, article_url):
+        """게시글에서 영단어 추출 (BeautifulSoup + 정규표현식)"""
+        try:
+            logger.info("게시글 상세 페이지 접속 중...")
 
-        body_container = soup.select_one(selector)
+            # requests로 HTML 가져오기 (더 빠름)
+            response = requests.get(article_url, timeout=10)
+            response.raise_for_status()
 
-        if body_container:
+            soup = BeautifulSoup(response.text, "lxml")
+            body_container = soup.select_one(self.BODY_SELECTOR)
+
+            if not body_container:
+                logger.error(
+                    f"Selector '{self.BODY_SELECTOR}'를 사용하여 본문을 찾을 수 없습니다."
+                )
+                return []
+
+            # 본문 텍스트 추출
             raw_text = " ".join(body_container.stripped_strings)
             full_text = re.sub(r"\s+", " ", raw_text).strip()
 
-            # 'Expression ]' 섹션 이후만 사용하도록 필터링
+            logger.info(f"본문 텍스트 추출 완료 (길이: {len(full_text)}자)")
+
+            # 'Expression ]' 섹션 이후만 사용
             parts = full_text.split("Expression ]")
             vocabulary_text = " ".join([part.strip() for part in parts[1:]])
 
-            # 후반부 불필요한 섹션 경계 제거
+            # 후반부 불필요한 섹션 제거
             vocabulary_text = vocabulary_text.split("idiom package")[0].strip()
             vocabulary_text = re.split(r"-{10,}", vocabulary_text)[0].strip()
             vocabulary_text = vocabulary_text.split(
                 "NEWS COVERAGE FROM THE NEW YORK TIMES"
             )[0].strip()
 
-            # --- 표준 패턴 추출 및 클리닝 ---
-            matches_bullet = WORD_PATTERN.findall(vocabulary_text)
+            final_matches = []
+
+            # --- 표준 패턴 추출 (▶ 기호로 시작하는 단어들) ---
+            matches_bullet = self.WORD_PATTERN.findall(vocabulary_text)
 
             for i, (eng, raw_kor) in enumerate(matches_bullet):
-                log_prefix = f"[Voca {i+1:02d}] Eng: '{eng.strip()[:10]}...'"
+                log_prefix = f"[단어 {i+1:02d}] '{eng.strip()[:20]}...'"
 
-                # 핵심: 한글 해석 클리닝 함수 호출 (여기서 relieve oneself 항목도 final_matches에 추가됨)
-                clean_kor = clean_korean_translation(raw_kor, log_prefix, final_matches)
+                # 한글 해석 클리닝
+                clean_kor = self.clean_korean_translation(
+                    raw_kor, log_prefix, final_matches
+                )
 
-                # 최종 단어 추가 (clean_kor는 노이즈가 제거된 상태)
+                # 최종 단어 추가
                 final_matches.append((eng.strip(), clean_kor))
 
-            # --- 비-표준 패턴 추출 및 클리닝 (NYT 섹션의 warm and fuzzy, measly 등) ---
-            matches_non_bullet = NON_BULLET_WORD_PATTERN.findall(vocabulary_text)
+            # --- 비표준 패턴 추출 (NYT 섹션의 단어들) ---
+            matches_non_bullet = self.NON_BULLET_WORD_PATTERN.findall(vocabulary_text)
 
             bullet_engs = {m[0] for m in final_matches}
 
@@ -195,98 +220,112 @@ def fetch_and_extract_body(url: str, selector: str) -> List[Tuple[str, str]]:
                     if not clean_kor.startswith(eng):
                         final_matches.append((eng.strip(), clean_kor))
 
-            logging.info(
-                f"--- [1/3] 텍스트 추출 완료. 총 {len(final_matches)}개의 단어 쌍 발견."
-            )
-            return final_matches
-        else:
-            logging.error(
-                f"Selector '{selector}'를 사용하여 본문 영역을 찾을 수 없습니다."
-            )
+            logger.info(f"✓ 총 {len(final_matches)}개의 단어 추출 완료")
+
+            # 추출된 단어 샘플 출력 (처음 5개)
+            for idx, (eng, kor) in enumerate(final_matches[:5], 1):
+                logger.info(f"  [{idx}] {eng} : {kor}")
+
+            if len(final_matches) > 5:
+                logger.info(f"  ... 외 {len(final_matches) - 5}개")
+
+            # 튜플 리스트를 딕셔너리 리스트로 변환
+            words = [
+                {"english_word": eng, "korean_meaning": kor}
+                for eng, kor in final_matches
+            ]
+
+            return words
+
+        except Exception as e:
+            logger.error(f"영단어 추출 중 에러 발생: {e}")
+            import traceback
+
+            traceback.print_exc()
             return []
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"URL 요청 실패: {e}")
-        return []
+    def save_to_database(self, date, words):
+        """DB 저장"""
+        import requests
+
+        api_url = "http://localhost:8000/api/v1/vocabulary/"
+
+        success_count = 0
+        fail_count = 0
+
+        logger.info(f"데이터베이스 저장 시작...")
+
+        for word in words:
+            try:
+                data = {
+                    "date": date,
+                    "english_word": word["english_word"],
+                    "korean_meaning": word["korean_meaning"],
+                }
+
+                response = requests.post(api_url, json=data, timeout=10)
+
+                if response.status_code in [200, 201]:
+                    success_count += 1
+                else:
+                    fail_count += 1
+                    logger.warning(f"  ✗ 저장 실패: {word['english_word']}")
+
+            except Exception as e:
+                fail_count += 1
+                logger.error(f"  ✗ 저장 중 에러: {word['english_word']} - {e}")
+
+        logger.info(f"저장 완료: 성공 {success_count}개, 실패 {fail_count}개")
+
+    def run(self):
+        """크롤러 실행"""
+        try:
+            logger.info("=" * 60)
+            logger.info("EBS 모닝스페셜 영단어 크롤러 시작")
+            logger.info("=" * 60)
+
+            # 1. 어제 날짜 계산
+            display_date, db_date = self.get_yesterday_date()
+            logger.info(f"대상 날짜: {display_date} (DB: {db_date})")
+
+            # 2. 게시판에서 어제 날짜 게시글 찾기
+            article_url = self.find_article_by_date(display_date)
+
+            if not article_url:
+                logger.warning("크롤링할 게시글이 없습니다.")
+                return
+
+            # 3. 영단어 추출
+            words = self.extract_vocabulary(article_url)
+
+            if not words:
+                logger.warning("추출된 단어가 없습니다.")
+                return
+
+            # 4. DB 저장
+            logger.info(f"데이터베이스 저장 시작 (날짜: {db_date})")
+            self.save_to_database(db_date, words)
+
+            logger.info("=" * 60)
+            logger.info("크롤러 실행 완료!")
+            logger.info("=" * 60)
+
+        except Exception as e:
+            logger.error(f"크롤러 실행 중 에러: {e}", exc_info=True)
+        finally:
+            self.close()
+
+    def close(self):
+        """브라우저 종료"""
+        if self.driver:
+            self.driver.quit()
+            logger.info("브라우저 종료")
 
 
-# --- MySQL DB 저장 로직 ---
-def save_vocabulary_to_mysql(
-    db_manager: DatabaseManager, vocabulary_list: List[Tuple[str, str]]
-):
-    """
-    단어 목록을 MySQL daily_vocabulary 테이블에 저장합니다.
-    (date, english_word)가 중복되면 korean_meaning 및 updated_at을 업데이트합니다.
-    """
-    if not vocabulary_list:
-        logging.info("[2/3] 저장할 단어가 없습니다. DB 작업을 건너뜝니다.")
-        return
-
-    logging.info(f"--- [2/3] MySQL DB 저장 시작 (총 {len(vocabulary_list)}개 항목) ---")
-
-    # DB에 저장할 기준 날짜 (YYYY-MM-DD)
-    extract_date = datetime.now().strftime("%Y-%m-%d")
-
-    # DDL에 따라, created_at과 updated_at은 DB가 자동 처리합니다.
-    # 따라서 쿼리에는 date, english_word, korean_meaning만 전달합니다.
-    upsert_query = """
-    INSERT INTO daily_vocabulary (date, english_word, korean_meaning)
-    VALUES (%s, %s, %s)
-    ON DUPLICATE KEY UPDATE
-        korean_meaning = VALUES(korean_meaning),
-        updated_at = CURRENT_TIMESTAMP;
-    """
-
-    data_to_save = []
-    for eng, kor in vocabulary_list:
-        data_to_save.append((extract_date, eng.strip(), kor.strip()))
-
-    try:
-        with db_manager.get_connection() as conn:
-            with conn.cursor() as cursor:
-                # executemany로 벌크 삽입/업데이트
-                affected_rows = cursor.executemany(upsert_query, data_to_save)
-                conn.commit()
-                logging.info(f"--- [2/3] DB 저장 완료. {affected_rows}개 행 처리됨.")
-
-    except Exception as e:
-        logging.error(f"MySQL 저장 중 치명적인 오류 발생: {e}")
-        raise
+def main():
+    crawler = EBSMorningCrawler(headless=True)  # headless=True로 백그라운드 실행
+    crawler.run()
 
 
-# --- 메인 실행 ---
 if __name__ == "__main__":
-
-    # --- 환경 변수 파일 생성 (테스트 환경 시뮬레이션) ---
-    # 실제 환경에서는 이 블록을 제거해야 합니다.
-    # .env.dev 파일을 생성하고 기본값을 저장합니다.
-    # 이 환경 변수는 사용자가 제공한 DDL 환경(dpai)을 가정합니다.
-    if not os.path.exists(".env.dev"):
-        with open(".env.dev", "w") as f:
-            f.write("DB_HOST=localhost\n")
-            f.write("DB_PORT=3306\n")
-            f.write("DB_USER=root\n")
-            f.write("DB_PASSWORD=1234\n")
-            f.write("DB_DATABASE=dpai\n")
-            logging.warning(
-                "로컬 테스트를 위한 '.env.dev' 파일이 생성되었습니다. DB 연결 정보를 확인하세요."
-            )
-
-    try:
-        # 1. DB 관리자 초기화
-        db_manager = DatabaseManager()
-
-        # 2. 크롤링 및 단어 추출
-        vocabulary_list = fetch_and_extract_body(ARTICLE_URL, BODY_SELECTOR)
-
-        # 3. DB 저장
-        save_vocabulary_to_mysql(db_manager, vocabulary_list)
-
-        # 4. 최종 결과 출력 (선택 사항)
-        logging.info("--- [3/3] 최종 추출 결과 ---")
-        for i, (eng, kor) in enumerate(vocabulary_list):
-            logging.info(f"[{i+1:02d}] 🇺🇸 {eng} | 🇰🇷 {kor}")
-        logging.info(f"=============================")
-
-    except Exception as e:
-        logging.critical(f"스크립트 실행 중 오류 발생: {e}")
+    main()

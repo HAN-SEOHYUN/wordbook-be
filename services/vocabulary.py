@@ -44,7 +44,6 @@ class VocabularyService:
                 )
             return VocabularyResponse.model_validate(db_word)
 
-    # --- [수정 완료: target_date를 앞으로 이동] ---
     def get_word_list(
         self, target_date: str, limit: int = 100, offset: int = 0
     ) -> List[VocabularyResponse]:
@@ -62,8 +61,6 @@ class VocabularyService:
             db_words = crud_voca.get_words(conn, limit, offset, target_date)
 
             return [VocabularyResponse.model_validate(word) for word in db_words]
-
-    # --- [수정 완료] ---
 
     def update_word(
         self, word_id: int, word_data: VocabularyUpdate
@@ -101,4 +98,29 @@ class VocabularyService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Database deletion failed: {e}",
+            )
+
+    def get_distinct_dates(self, limit: int = 5) -> List[str]:
+        """
+        데이터베이스에 저장된 고유한 날짜 목록을 최신순으로 조회합니다.
+
+        Args:
+            limit: 반환할 최대 날짜 개수 (기본값: 5)
+
+        Returns:
+            날짜 문자열 리스트 (YYYY-MM-DD 형식, 최신순)
+        """
+        try:
+            with self.db.get_connection() as conn:
+                rows = crud_voca.get_distinct_dates(conn, limit)
+
+                # DictCursor를 사용하므로 딕셔너리 형태로 반환됨
+                # rows는 [{'date': datetime.date(2025, 1, 22)}, ...] 형태
+                dates = [str(row["date"]) for row in rows]
+
+                return dates
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to fetch distinct dates: {e}",
             )
