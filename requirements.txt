@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+pydantic[standard]
+pymysql
+python-dotenv
