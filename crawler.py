@@ -8,15 +8,17 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import re
-import time
 import logging
 import requests
 
-# 로깅 설정
+# config import
+import config
+
+# 로깅 설정 (config에서 읽기)
 logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] %(levelname)s: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    level=getattr(logging, config.LOG_LEVEL),
+    format=config.LOG_FORMAT,
+    datefmt=config.LOG_DATE_FORMAT,
 )
 logger = logging.getLogger(__name__)
 
@@ -24,20 +26,19 @@ logger = logging.getLogger(__name__)
 class EBSMorningCrawler:
     """EBS 모닝스페셜 영단어 크롤러"""
 
-    BASE_URL = "https://home.ebs.co.kr"
-    BOARD_URL = "https://home.ebs.co.kr/morning/board/6/502387/list?hmpMnuId=101"
-    BODY_SELECTOR = "div.con_txt"
-
     # 정규표현식 패턴
     WORD_PATTERN = re.compile(r"▶\s*(.*?)\s*:\s*(.*?)(?=\s*▶|\Z)", re.DOTALL)
     NON_BULLET_WORD_PATTERN = re.compile(
         r"([a-zA-Z\s\-\/]+?):\s*(.*?)(?=\s*▶|\s*[a-zA-Z\s\-\/]+?:|\Z)", re.DOTALL
     )
 
-    def __init__(self, headless=True):
+    def __init__(self):
+        """크롤러 초기화 (config에서 설정 읽기)"""
         chrome_options = Options()
-        if headless:
+
+        if config.HEADLESS_MODE:
             chrome_options.add_argument("--headless")
+
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
@@ -48,28 +49,34 @@ class EBSMorningCrawler:
 
         service = Service(ChromeDriverManager().install())
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        self.wait = WebDriverWait(self.driver, 10)
+        self.wait = WebDriverWait(self.driver, config.PAGE_LOAD_TIMEOUT)
 
-    def get_yesterday_date(self):
-        """어제 날짜 계산"""
-        yesterday = datetime.now() - timedelta(days=1)
-        display_format = yesterday.strftime("%Y.%m.%d")
-        db_format = yesterday.strftime("%Y-%m-%d")
+    def calculate_target_date(self, days_ago: int):
+        """
+        날짜 계산 함수
+
+        Args:
+            days_ago: 며칠 전
+
+        Returns:
+            tuple: (표시용 날짜, DB용 날짜)
+        """
+        target_date = datetime.now() - timedelta(days=days_ago)
+        display_format = target_date.strftime("%Y.%m.%d")
+        db_format = target_date.strftime("%Y-%m-%d")
         return display_format, db_format
 
-    def find_article_by_date(self, target_date):
+    def find_article_by_date(self, target_date: str):
         """게시판에서 특정 날짜의 게시글 찾기"""
         try:
             logger.info(f"게시판 페이지 접속 중...")
-            self.driver.get(self.BOARD_URL)
+            self.driver.get(config.BOARD_URL)
 
-            # 게시글 목록이 로드될 때까지 대기
             self.wait.until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "#itemList > tr"))
             )
             logger.info("페이지 로드 완료")
 
-            # 게시글 목록 가져오기 (공지사항 제외)
             rows = self.driver.find_elements(
                 By.CSS_SELECTOR, "#itemList > tr:not(.notice)"
             )
@@ -82,21 +89,25 @@ class EBSMorningCrawler:
                     if len(tds) < 5:
                         continue
 
-                    # 날짜는 4번째 td (인덱스 3)
+                    # 게시글 제목을 가져옵니다. (방송일 정보가 포함되어 있을 가능성이 높음)
+                    link_element = tds[1].find_element(By.TAG_NAME, "a")
+                    title = link_element.text.strip()
+
+                    # 게시판 목록의 날짜도 가져옵니다. (디버깅/정보용)
                     date_text = tds[3].text.strip()
 
-                    if date_text == target_date:
-                        # 제목 컬럼에서 링크 추출
-                        link_element = tds[1].find_element(By.TAG_NAME, "a")
+                    # ⭐ 핵심 수정: 게시판 날짜 대신, 게시글 제목에 'target_date'가 포함되어 있는지 확인합니다.
+                    # target_date는 'YYYY.MM.DD' 형식이고, title은 'YYYY.MM.DD. Day. (...)' 형식일 수 있습니다.
+                    if target_date in title:
+
                         href = link_element.get_attribute("href")
 
                         if href.startswith("/"):
-                            full_url = self.BASE_URL + href
+                            full_url = config.BASE_URL + href
                         else:
                             full_url = href
 
-                        title = link_element.text.strip()
-                        logger.info(f"✓ 발견: {title}")
+                        logger.info(f"✓ 발견: {title} (게시일: {date_text})")
                         logger.info(f"  URL: {full_url}")
 
                         return full_url
@@ -115,12 +126,9 @@ class EBSMorningCrawler:
     def clean_korean_translation(
         self, raw_kor: str, log_prefix: str, final_matches: list
     ) -> str:
-        """
-        한글 해석 문자열에서 불필요하게 섞여 들어간 기사 본문 및 다른 어휘 항목을 제거
-        """
+        """한글 해석 클리닝"""
         clean_kor = raw_kor
 
-        # 1. 'relieve oneself' 항목 처리
         relieve_pattern = r"relieve oneself\[nature\]\s*:\s*대소변을 보다"
         relieve_match = re.search(relieve_pattern, clean_kor, re.DOTALL | re.IGNORECASE)
 
@@ -137,7 +145,6 @@ class EBSMorningCrawler:
             cut_index = relieve_match.start()
             clean_kor = clean_kor[:cut_index].strip()
 
-        # 2. 다음 뉴스 기사 번호 시작 패턴
         news_body_start_match = re.search(
             r"\s*\d+\.\s*([A-Z]|\s*서울시는|\s*영국|\s*미국의)", clean_kor, re.DOTALL
         )
@@ -147,7 +154,6 @@ class EBSMorningCrawler:
             clean_kor = clean_kor[:cut_index].strip()
             logger.debug(f"{log_prefix} [Clean] Cut at News Item Start")
 
-        # 3. 'Expression' 마커
         expression_marker = "Expression"
         if expression_marker in clean_kor:
             cut_index = clean_kor.find(expression_marker)
@@ -157,34 +163,30 @@ class EBSMorningCrawler:
         return clean_kor.strip()
 
     def extract_vocabulary(self, article_url):
-        """게시글에서 영단어 추출 (BeautifulSoup + 정규표현식)"""
+        """게시글에서 영단어 추출"""
         try:
             logger.info("게시글 상세 페이지 접속 중...")
 
-            # requests로 HTML 가져오기 (더 빠름)
-            response = requests.get(article_url, timeout=10)
+            response = requests.get(article_url, timeout=config.HTTP_TIMEOUT)
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, "lxml")
-            body_container = soup.select_one(self.BODY_SELECTOR)
+            body_container = soup.select_one(config.BODY_SELECTOR)
 
             if not body_container:
                 logger.error(
-                    f"Selector '{self.BODY_SELECTOR}'를 사용하여 본문을 찾을 수 없습니다."
+                    f"Selector '{config.BODY_SELECTOR}'를 사용하여 본문을 찾을 수 없습니다."
                 )
                 return []
 
-            # 본문 텍스트 추출
             raw_text = " ".join(body_container.stripped_strings)
             full_text = re.sub(r"\s+", " ", raw_text).strip()
 
             logger.info(f"본문 텍스트 추출 완료 (길이: {len(full_text)}자)")
 
-            # 'Expression ]' 섹션 이후만 사용
             parts = full_text.split("Expression ]")
             vocabulary_text = " ".join([part.strip() for part in parts[1:]])
 
-            # 후반부 불필요한 섹션 제거
             vocabulary_text = vocabulary_text.split("idiom package")[0].strip()
             vocabulary_text = re.split(r"-{10,}", vocabulary_text)[0].strip()
             vocabulary_text = vocabulary_text.split(
@@ -193,23 +195,16 @@ class EBSMorningCrawler:
 
             final_matches = []
 
-            # --- 표준 패턴 추출 (▶ 기호로 시작하는 단어들) ---
             matches_bullet = self.WORD_PATTERN.findall(vocabulary_text)
 
             for i, (eng, raw_kor) in enumerate(matches_bullet):
                 log_prefix = f"[단어 {i+1:02d}] '{eng.strip()[:20]}...'"
-
-                # 한글 해석 클리닝
                 clean_kor = self.clean_korean_translation(
                     raw_kor, log_prefix, final_matches
                 )
-
-                # 최종 단어 추가
                 final_matches.append((eng.strip(), clean_kor))
 
-            # --- 비표준 패턴 추출 (NYT 섹션의 단어들) ---
             matches_non_bullet = self.NON_BULLET_WORD_PATTERN.findall(vocabulary_text)
-
             bullet_engs = {m[0] for m in final_matches}
 
             for eng, raw_kor in matches_non_bullet:
@@ -222,14 +217,9 @@ class EBSMorningCrawler:
 
             logger.info(f"✓ 총 {len(final_matches)}개의 단어 추출 완료")
 
-            # 추출된 단어 샘플 출력 (처음 5개)
-            for idx, (eng, kor) in enumerate(final_matches[:5], 1):
+            for idx, (eng, kor) in enumerate(final_matches, 1):
                 logger.info(f"  [{idx}] {eng} : {kor}")
 
-            if len(final_matches) > 5:
-                logger.info(f"  ... 외 {len(final_matches) - 5}개")
-
-            # 튜플 리스트를 딕셔너리 리스트로 변환
             words = [
                 {"english_word": eng, "korean_meaning": kor}
                 for eng, kor in final_matches
@@ -245,15 +235,20 @@ class EBSMorningCrawler:
             return []
 
     def save_to_database(self, date, words):
-        """DB 저장"""
-        import requests
+        """DB 저장 (config.DIRECT_DB_SAVE에 따라 API 또는 직접 저장)"""
 
-        api_url = "http://localhost:8000/api/v1/vocabulary/"
+        if config.DIRECT_DB_SAVE:
+            self._save_to_db_directly(date, words)
+        else:
+            self._save_via_api(date, words)
+
+    def _save_via_api(self, date, words):
+        """API를 통해 저장"""
 
         success_count = 0
         fail_count = 0
 
-        logger.info(f"데이터베이스 저장 시작...")
+        logger.info(f"API를 통해 저장 중...")
 
         for word in words:
             try:
@@ -263,7 +258,9 @@ class EBSMorningCrawler:
                     "korean_meaning": word["korean_meaning"],
                 }
 
-                response = requests.post(api_url, json=data, timeout=10)
+                response = requests.post(
+                    config.API_ENDPOINT, json=data, timeout=config.HTTP_TIMEOUT
+                )
 
                 if response.status_code in [200, 201]:
                     success_count += 1
@@ -277,6 +274,46 @@ class EBSMorningCrawler:
 
         logger.info(f"저장 완료: 성공 {success_count}개, 실패 {fail_count}개")
 
+    def _save_to_db_directly(self, date, words):
+        """DB에 직접 저장"""
+        from core.database import DatabaseManager
+
+        logger.info(f"DB에 직접 저장 중...")
+
+        db_manager = DatabaseManager()
+
+        upsert_query = """
+        INSERT INTO daily_vocabulary (date, english_word, korean_meaning)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            korean_meaning = VALUES(korean_meaning),
+            updated_at = CURRENT_TIMESTAMP;
+        """
+
+        success_count = 0
+        fail_count = 0
+
+        try:
+            with db_manager.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    for word in words:
+                        try:
+                            cursor.execute(
+                                upsert_query,
+                                (date, word["english_word"], word["korean_meaning"]),
+                            )
+                            success_count += 1
+                        except Exception as e:
+                            fail_count += 1
+                            logger.error(f"  ✗ 저장 실패: {word['english_word']} - {e}")
+
+                    conn.commit()
+
+            logger.info(f"저장 완료: 성공 {success_count}개, 실패 {fail_count}개")
+
+        except Exception as e:
+            logger.error(f"DB 저장 중 에러: {e}")
+
     def run(self):
         """크롤러 실행"""
         try:
@@ -284,30 +321,55 @@ class EBSMorningCrawler:
             logger.info("EBS 모닝스페셜 영단어 크롤러 시작")
             logger.info("=" * 60)
 
-            # 1. 어제 날짜 계산
-            display_date, db_date = self.get_yesterday_date()
+            # 설정 출력
+            config.print_config()
+
+            # 날짜 계산
+            display_date, db_date = self.calculate_target_date(config.DAYS_AGO)
             logger.info(f"대상 날짜: {display_date} (DB: {db_date})")
 
-            # 2. 게시판에서 어제 날짜 게시글 찾기
-            article_url = self.find_article_by_date(display_date)
+            # 재시도 로직
+            if config.AUTO_RETRY_PREVIOUS_DATE:
+                logger.info(
+                    f"자동 재시도 활성화: 최대 {config.MAX_RETRY_DAYS}일 전까지 시도"
+                )
+                date_range = []
+                for i in range(
+                    config.DAYS_AGO, config.DAYS_AGO + config.MAX_RETRY_DAYS
+                ):
+                    date_range.append(self.calculate_target_date(i))
+            else:
+                date_range = [(display_date, db_date)]
+
+            article_url = None
+            selected_db_date = None
+
+            # 날짜별 게시글 검색
+            for display, db in date_range:
+                logger.info(f"📅 날짜 시도: {display}")
+                article_url = self.find_article_by_date(display)
+
+                if article_url:
+                    selected_db_date = db
+                    break
 
             if not article_url:
                 logger.warning("크롤링할 게시글이 없습니다.")
                 return
 
-            # 3. 영단어 추출
+            # 영단어 추출
             words = self.extract_vocabulary(article_url)
 
             if not words:
                 logger.warning("추출된 단어가 없습니다.")
                 return
 
-            # 4. DB 저장
-            logger.info(f"데이터베이스 저장 시작 (날짜: {db_date})")
-            self.save_to_database(db_date, words)
+            # DB 저장
+            logger.info(f"데이터베이스 저장 시작 (날짜: {selected_db_date})")
+            self.save_to_database(selected_db_date, words)
 
             logger.info("=" * 60)
-            logger.info("크롤러 실행 완료!")
+            logger.info("✅ 크롤러 실행 완료!")
             logger.info("=" * 60)
 
         except Exception as e:
@@ -323,7 +385,15 @@ class EBSMorningCrawler:
 
 
 def main():
-    crawler = EBSMorningCrawler(headless=True)  # headless=True로 백그라운드 실행
+    """메인 함수"""
+    # 설정 검증
+    try:
+        config.validate_config()
+    except ValueError as e:
+        logger.error(f"설정 오류: {e}")
+        return
+
+    crawler = EBSMorningCrawler()
     crawler.run()
 
 
