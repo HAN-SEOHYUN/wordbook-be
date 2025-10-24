@@ -107,16 +107,16 @@ def validate_config() -> None:
 def print_config() -> None:
     """현재 설정 출력"""
     print("=" * 60)
-    print("📝 크롤러 설정")
+    print("크롤러 설정")
     print("=" * 60)
-    print(f"🗓️  대상 날짜: {DAYS_AGO}일 전")
-    print(f"🌐 API URL: {API_ENDPOINT}")
-    print(f"🖥️  Headless 모드: {HEADLESS_MODE}")
-    print(f"🔄 자동 재시도: {AUTO_RETRY_PREVIOUS_DATE}")
+    print(f"대상 날짜: {DAYS_AGO}일 전")
+    print(f"API URL: {API_ENDPOINT}")
+    print(f"Headless 모드: {HEADLESS_MODE}")
+    print(f"자동 재시도: {AUTO_RETRY_PREVIOUS_DATE}")
     if AUTO_RETRY_PREVIOUS_DATE:
         print(f"   └─ 최대 {MAX_RETRY_DAYS}일 전까지 시도")
-    print(f"💾 저장 방식: {'DB 직접' if DIRECT_DB_SAVE else 'API 사용'}")
-    print(f"📊 로그 레벨: {LOG_LEVEL}")
+    print(f"저장 방식: {'DB 직접' if DIRECT_DB_SAVE else 'API 사용'}")
+    print(f"로그 레벨: {LOG_LEVEL}")
     print("=" * 60)
 
 

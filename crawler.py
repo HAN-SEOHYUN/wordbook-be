@@ -47,7 +47,18 @@ class EBSMorningCrawler:
             "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
 
-        service = Service(ChromeDriverManager().install())
+        # ChromeDriver 설치 및 경로 가져오기
+        driver_path = ChromeDriverManager().install()
+        logger.info(f"ChromeDriver path: {driver_path}")
+
+        # 경로가 THIRD_PARTY_NOTICES 파일을 가리키는 경우 수정
+        if "THIRD_PARTY_NOTICES" in driver_path:
+            import os
+            driver_dir = os.path.dirname(driver_path)
+            driver_path = os.path.join(driver_dir, "chromedriver.exe")
+            logger.info(f"Fixed ChromeDriver path: {driver_path}")
+
+        service = Service(driver_path)
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.wait = WebDriverWait(self.driver, config.PAGE_LOAD_TIMEOUT)
 
@@ -234,15 +245,15 @@ class EBSMorningCrawler:
             traceback.print_exc()
             return []
 
-    def save_to_database(self, date, words):
+    def save_to_database(self, date, words, source_url):
         """DB 저장 (config.DIRECT_DB_SAVE에 따라 API 또는 직접 저장)"""
 
         if config.DIRECT_DB_SAVE:
-            self._save_to_db_directly(date, words)
+            self._save_to_db_directly(date, words, source_url)
         else:
-            self._save_via_api(date, words)
+            self._save_via_api(date, words, source_url)
 
-    def _save_via_api(self, date, words):
+    def _save_via_api(self, date, words, source_url):
         """API를 통해 저장"""
 
         success_count = 0
@@ -256,6 +267,7 @@ class EBSMorningCrawler:
                     "date": date,
                     "english_word": word["english_word"],
                     "korean_meaning": word["korean_meaning"],
+                    "source_url": source_url,
                 }
 
                 response = requests.post(
@@ -274,7 +286,7 @@ class EBSMorningCrawler:
 
         logger.info(f"저장 완료: 성공 {success_count}개, 실패 {fail_count}개")
 
-    def _save_to_db_directly(self, date, words):
+    def _save_to_db_directly(self, date, words, source_url):
         """DB에 직접 저장"""
         from core.database import DatabaseManager
 
@@ -283,10 +295,11 @@ class EBSMorningCrawler:
         db_manager = DatabaseManager()
 
         upsert_query = """
-        INSERT INTO daily_vocabulary (date, english_word, korean_meaning)
-        VALUES (%s, %s, %s)
+        INSERT INTO daily_vocabulary (date, english_word, korean_meaning, source_url)
+        VALUES (%s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
             korean_meaning = VALUES(korean_meaning),
+            source_url = VALUES(source_url),
             updated_at = CURRENT_TIMESTAMP;
         """
 
@@ -300,7 +313,7 @@ class EBSMorningCrawler:
                         try:
                             cursor.execute(
                                 upsert_query,
-                                (date, word["english_word"], word["korean_meaning"]),
+                                (date, word["english_word"], word["korean_meaning"], source_url),
                             )
                             success_count += 1
                         except Exception as e:
@@ -366,7 +379,7 @@ class EBSMorningCrawler:
 
             # DB 저장
             logger.info(f"데이터베이스 저장 시작 (날짜: {selected_db_date})")
-            self.save_to_database(selected_db_date, words)
+            self.save_to_database(selected_db_date, words, article_url)
 
             logger.info("=" * 60)
             logger.info("✅ 크롤러 실행 완료!")

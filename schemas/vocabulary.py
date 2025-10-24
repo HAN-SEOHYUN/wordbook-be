@@ -17,6 +17,7 @@ def validate_date_format(value: str) -> str:
 class VocabularyBase(BaseModel):
     english_word: str
     korean_meaning: str
+    source_url: Optional[str] = None
 
 
 # 1. 생성 요청 (POST /) 모델
