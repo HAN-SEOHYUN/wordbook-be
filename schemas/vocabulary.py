@@ -31,10 +31,10 @@ class VocabularyCreate(VocabularyBase):
 
 
 # 2. 업데이트 요청 (PUT /{word_id}) 모델
-class VocabularyUpdate(VocabularyBase):
-    # PUT 요청 시에는 date와 english_word를 바꾸지 않는 것이 일반적이나,
-    # 사용자 요구에 따라 english_word와 korean_meaning만 업데이트 대상으로 간주
-    pass
+# source_url을 제외하고 english_word와 korean_meaning만 업데이트
+class VocabularyUpdate(BaseModel):
+    english_word: str
+    korean_meaning: str
 
 
 # 3. 응답 모델 (Read/Create/Update 응답)

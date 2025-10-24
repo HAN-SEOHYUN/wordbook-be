@@ -92,21 +92,21 @@ def update_word(
     conn: Connection, word_id: int, word_data: VocabularyUpdate
 ) -> Optional[Dict[str, Any]]:
     """
-    단어 ID를 기반으로 korean_meaning, english_word, source_url을 업데이트합니다.
+    단어 ID를 기반으로 korean_meaning, english_word만 업데이트합니다.
+    source_url은 수정하지 않고 보존됩니다.
     """
     sql = f"""
     UPDATE {TABLE_NAME}
     SET
         english_word = %s,
         korean_meaning = %s,
-        source_url = %s,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = %s;
     """
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                sql, (word_data.english_word, word_data.korean_meaning, word_data.source_url, word_id)
+                sql, (word_data.english_word, word_data.korean_meaning, word_id)
             )
             conn.commit()
             if cursor.rowcount == 0:
