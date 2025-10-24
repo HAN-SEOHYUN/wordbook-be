@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 
 
 # 유틸리티: YYYY-MM-DD 형식 검증
@@ -47,3 +47,10 @@ class VocabularyResponse(VocabularyBase):
     # ORM 모드 활성화 (DB 딕셔너리 결과와 매핑)
     class Config:
         from_attributes = True
+
+
+# 4. 날짜별 단어 목록 응답 모델 (날짜 + source_url + 단어 목록)
+class VocabularyListResponse(BaseModel):
+    date: str  # YYYY-MM-DD
+    source_url: Optional[str] = None  # 해당 날짜의 대표 source_url (null이 아닌 값 중 하나)
+    words: List[VocabularyResponse]  # 단어 목록

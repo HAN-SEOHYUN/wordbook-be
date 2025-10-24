@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict
 from fastapi import HTTPException, status
 from core.database import DatabaseManager
-from schemas.vocabulary import VocabularyCreate, VocabularyUpdate, VocabularyResponse
+from schemas.vocabulary import VocabularyCreate, VocabularyUpdate, VocabularyResponse, VocabularyListResponse
 from crud import vocabulary as crud_voca
 from schemas.vocabulary import validate_date_format
 
@@ -46,9 +46,10 @@ class VocabularyService:
 
     def get_word_list(
         self, target_date: str, limit: int = 100, offset: int = 0
-    ) -> List[VocabularyResponse]:
+    ) -> VocabularyListResponse:
         """
         단어 목록을 조회합니다. target_date가 필수입니다.
+        날짜, 대표 source_url, 단어 목록을 포함한 구조화된 응답을 반환합니다.
         """
 
         # 날짜 포맷 유효성 검사
@@ -58,9 +59,19 @@ class VocabularyService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
         with self.db.get_connection() as conn:
+            # 단어 목록 조회
             db_words = crud_voca.get_words(conn, limit, offset, target_date)
+            words = [VocabularyResponse.model_validate(word) for word in db_words]
 
-            return [VocabularyResponse.model_validate(word) for word in db_words]
+            # 대표 source_url 조회 (null이 아닌 값 중 하나)
+            source_url = crud_voca.get_representative_source_url(conn, target_date)
+
+            # 새로운 응답 구조로 반환
+            return VocabularyListResponse(
+                date=target_date,
+                source_url=source_url,
+                words=words
+            )
 
     def update_word(
         self, word_id: int, word_data: VocabularyUpdate

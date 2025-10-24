@@ -88,6 +88,26 @@ def get_words(
         return cursor.fetchall()
 
 
+def get_representative_source_url(
+    conn: Connection, target_date: str
+) -> Optional[str]:
+    """
+    특정 날짜의 단어들 중 source_url이 null이 아닌 값 하나를 반환합니다.
+    """
+    sql = f"""
+    SELECT source_url
+    FROM {TABLE_NAME}
+    WHERE date = %s AND source_url IS NOT NULL
+    LIMIT 1;
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(sql, (target_date,))
+        result = cursor.fetchone()
+        if result:
+            return result.get('source_url')
+        return None
+
+
 def update_word(
     conn: Connection, word_id: int, word_data: VocabularyUpdate
 ) -> Optional[Dict[str, Any]]:

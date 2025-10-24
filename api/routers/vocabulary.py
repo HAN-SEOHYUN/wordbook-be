@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, status
 from typing import List, Dict
 from core.database import DatabaseManager
 from services.vocabulary import VocabularyService
-from schemas.vocabulary import VocabularyCreate, VocabularyUpdate, VocabularyResponse
+from schemas.vocabulary import VocabularyCreate, VocabularyUpdate, VocabularyResponse, VocabularyListResponse
 
 # FastAPI Router 인스턴스 생성
 router = APIRouter(
@@ -62,7 +62,7 @@ def create_vocabulary(
 
 
 @router.get(
-    "/", response_model=List[VocabularyResponse], summary="Get List of Vocabulary Items"
+    "/", response_model=VocabularyListResponse, summary="Get List of Vocabulary Items with Date and Source URL"
 )
 def get_vocabulary_list(
     # target_date를 필수 쿼리 파라미터로 지정
@@ -76,6 +76,7 @@ def get_vocabulary_list(
 ):
     """
     단어 목록을 조회합니다. 날짜 필터링, 페이징(limit/offset)을 지원합니다.
+    응답에는 날짜, 대표 source_url, 단어 목록이 포함됩니다.
     """
     # Service layer: get_word_list(self, target_date: str, limit: int = 100, offset: int = 0) 순서에 맞춤
     return service.get_word_list(target_date, limit, offset)
