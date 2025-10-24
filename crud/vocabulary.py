@@ -80,7 +80,7 @@ def get_words(
     if where_clause:
         sql += " WHERE " + " AND ".join(where_clause)
 
-    sql += " ORDER BY date DESC, id DESC LIMIT %s OFFSET %s;"
+    sql += " ORDER BY date DESC, id ASC LIMIT %s OFFSET %s;"
     params.extend([limit, offset])
 
     with conn.cursor() as cursor:
