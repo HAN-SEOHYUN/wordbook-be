@@ -54,6 +54,7 @@ class EBSMorningCrawler:
         # 경로가 THIRD_PARTY_NOTICES 파일을 가리키는 경우 수정
         if "THIRD_PARTY_NOTICES" in driver_path:
             import os
+
             driver_dir = os.path.dirname(driver_path)
             driver_path = os.path.join(driver_dir, "chromedriver.exe")
             logger.info(f"Fixed ChromeDriver path: {driver_path}")
@@ -195,7 +196,15 @@ class EBSMorningCrawler:
 
             logger.info(f"본문 텍스트 추출 완료 (길이: {len(full_text)}자)")
 
-            parts = full_text.split("Expression ]")
+            # [Expressions] 또는 Expressions 키워드로 분할
+            if "[Expressions]" in full_text:
+                parts = full_text.split("[Expressions]")
+            elif "Expression ]" in full_text:
+                parts = full_text.split("Expression ]")
+            else:
+                logger.error("Expressions 구분자를 찾을 수 없습니다.")
+                return []
+
             vocabulary_text = " ".join([part.strip() for part in parts[1:]])
 
             vocabulary_text = vocabulary_text.split("idiom package")[0].strip()
@@ -313,7 +322,12 @@ class EBSMorningCrawler:
                         try:
                             cursor.execute(
                                 upsert_query,
-                                (date, word["english_word"], word["korean_meaning"], source_url),
+                                (
+                                    date,
+                                    word["english_word"],
+                                    word["korean_meaning"],
+                                    source_url,
+                                ),
                             )
                             success_count += 1
                         except Exception as e:
@@ -340,6 +354,15 @@ class EBSMorningCrawler:
             # 날짜 계산
             display_date, db_date = self.calculate_target_date(config.DAYS_AGO)
             logger.info(f"대상 날짜: {display_date} (DB: {db_date})")
+
+            # 금요일 체크 (금요일이면 실행하지 않음)
+            target_date_obj = datetime.strptime(db_date, "%Y-%m-%d")
+            if target_date_obj.weekday() == 4:  # 4 = 금요일 (0=월요일, 6=일요일)
+                logger.info("=" * 60)
+                logger.info("금요일은 EBS 모닝스페셜 단어를 수집하지 않습니다.")
+                logger.info("크롤러를 종료합니다.")
+                logger.info("=" * 60)
+                return
 
             # 재시도 로직
             if config.AUTO_RETRY_PREVIOUS_DATE:
