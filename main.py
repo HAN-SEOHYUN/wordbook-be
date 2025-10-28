@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # 1. api/routers/vocabulary.py 파일에서 router 객체를 가져옵니다.
 from api.routers.vocabulary import router as vocabulary_router
+from api.routers.tts import router as tts_router
 
 # FastAPI 애플리케이션 초기화
 app = FastAPI(
@@ -27,6 +29,10 @@ app.add_middleware(
 # 2. 라우터 객체를 메인 애플리케이션에 등록합니다.
 # '/api/v1' 프리픽스를 사용하여 모든 엔드포인트 URL 앞에 붙여줍니다.
 app.include_router(vocabulary_router, prefix="/api/v1")
+app.include_router(tts_router, prefix="/api/v1")
+
+# 3. Static 파일 서빙 설정 (오디오 캐시 파일 제공)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/", tags=["Root"])

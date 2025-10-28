@@ -15,7 +15,7 @@ from typing import Dict, Any
 # ============================================================
 
 # 크롤링할 날짜 (며칠 전)
-DAYS_AGO: int = 4
+DAYS_AGO: int = 5
 
 # 예시:
 # DAYS_AGO = 1  → 어제 날짜 크롤링

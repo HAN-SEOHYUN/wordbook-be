@@ -8,3 +8,4 @@
   beautifulsoup4
   lxml
   requests
+  edge-tts>=6.1.0
