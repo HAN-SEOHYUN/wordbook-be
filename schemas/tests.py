@@ -43,10 +43,9 @@ class AnswerItem(BaseModel):
 
     @field_validator("user_answer")
     @classmethod
-    def check_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("user_answer cannot be empty")
-        return v.strip()
+    def normalize_answer(cls, v: str) -> str:
+        # 빈 답안 허용 (strip만 수행)
+        return v.strip() if v else ""
 
 # 답안 제출 요청
 class TestSubmitRequest(BaseModel):
