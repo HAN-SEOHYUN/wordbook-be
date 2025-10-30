@@ -34,13 +34,17 @@ def get_vocabulary_service(
 @router.get(
     "/dates",
     response_model=List[str],
-    summary="Get List of Available Dates (Max 5, Newest First)",
+    summary="Get Test Week Dates (This Saturday's Test Range)",
 )
 def get_available_dates(
     service: VocabularyService = Depends(get_vocabulary_service),
 ):
     """
-    데이터베이스에 저장된 고유한 단어 추출 날짜 목록을 최신순으로 최대 5개 조회합니다.
+    이번주 토요일 시험 범위의 날짜 목록을 반환합니다.
+    test_week_info의 가장 최근 주차의 start_date ~ end_date 범위 내 날짜만 반환합니다.
+
+    Returns:
+        List[str]: 시험 범위 날짜 리스트 (YYYY-MM-DD 형식, 최신순)
     """
     return service.get_distinct_dates()
 

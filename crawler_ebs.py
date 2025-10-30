@@ -47,6 +47,11 @@ class EBSMorningCrawler:
             "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
 
+        # Chrome 내부 로그 억제
+        chrome_options.add_argument("--log-level=3")
+        chrome_options.add_argument("--disable-logging")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+
         # ChromeDriver 설치 및 경로 가져오기
         driver_path = ChromeDriverManager().install()
         logger.info(f"ChromeDriver path: {driver_path}")
@@ -352,7 +357,7 @@ class EBSMorningCrawler:
             config.print_config()
 
             # 날짜 계산
-            display_date, db_date = self.calculate_target_date(config.DAYS_AGO)
+            display_date, db_date = self.calculate_target_date(config.EBS_DAYS_AGO)
             logger.info(f"대상 날짜: {display_date} (DB: {db_date})")
 
             # 금요일 체크 (금요일이면 실행하지 않음)
@@ -371,7 +376,7 @@ class EBSMorningCrawler:
                 )
                 date_range = []
                 for i in range(
-                    config.DAYS_AGO, config.DAYS_AGO + config.MAX_RETRY_DAYS
+                    config.EBS_DAYS_AGO, config.EBS_DAYS_AGO + config.MAX_RETRY_DAYS
                 ):
                     date_range.append(self.calculate_target_date(i))
             else:

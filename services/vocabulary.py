@@ -113,25 +113,52 @@ class VocabularyService:
 
     def get_distinct_dates(self, limit: int = 5) -> List[str]:
         """
-        데이터베이스에 저장된 고유한 날짜 목록을 최신순으로 조회합니다.
+        이번주 토요일 시험 범위의 날짜 목록을 반환합니다.
+        test_week_info의 가장 최근 주차의 start_date ~ end_date 범위 내 날짜만 반환합니다.
 
         Args:
-            limit: 반환할 최대 날짜 개수 (기본값: 5)
+            limit: 반환할 최대 날짜 개수 (기본값: 5, 사용되지 않음)
 
         Returns:
             날짜 문자열 리스트 (YYYY-MM-DD 형식, 최신순)
         """
         try:
             with self.db.get_connection() as conn:
-                rows = crud_voca.get_distinct_dates(conn, limit)
+                with conn.cursor() as cursor:
+                    # 1. 가장 최근 주차 정보 조회
+                    week_query = """
+                    SELECT start_date, end_date
+                    FROM test_week_info
+                    ORDER BY twi_id DESC
+                    LIMIT 1
+                    """
+                    cursor.execute(week_query)
+                    week_info = cursor.fetchone()
 
-                # DictCursor를 사용하므로 딕셔너리 형태로 반환됨
-                # rows는 [{'date': datetime.date(2025, 1, 22)}, ...] 형태
-                dates = [str(row["date"]) for row in rows]
+                    if not week_info:
+                        # 주차 정보가 없으면 빈 리스트 반환
+                        return []
 
-                return dates
+                    start_date = str(week_info["start_date"])
+                    end_date = str(week_info["end_date"])
+
+                    # 2. 해당 범위의 날짜 조회
+                    date_query = """
+                    SELECT DISTINCT date
+                    FROM word_book
+                    WHERE date BETWEEN %s AND %s
+                    ORDER BY date DESC
+                    """
+                    cursor.execute(date_query, (start_date, end_date))
+                    rows = cursor.fetchall()
+
+                    # 날짜 문자열 리스트로 변환
+                    dates = [str(row["date"]) for row in rows]
+
+                    return dates
+
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to fetch distinct dates: {e}",
+                detail=f"Failed to fetch test week dates: {e}",
             )
