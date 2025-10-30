@@ -46,7 +46,7 @@ class TestWeekCreator:
 
         return saturday.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    def calculate_week_info(self, saturday: datetime) -> Tuple[str, str, str]:
+    def calculate_week_info(self, saturday: datetime) -> Tuple[str, str, str, str, str]:
         """
         토요일 날짜를 기준으로 주차 정보 계산
 
@@ -54,10 +54,12 @@ class TestWeekCreator:
             saturday: 토요일 날짜
 
         Returns:
-            (name, start_date, end_date) 튜플
+            (name, start_date, end_date, test_start_datetime, test_end_datetime) 튜플
             - name: "n월 n주차"
             - start_date: 전주 목요일 (YYYY-MM-DD)
             - end_date: 당주 수요일 (YYYY-MM-DD)
+            - test_start_datetime: 토요일 10:10:00 (YYYY-MM-DD HH:MM:SS)
+            - test_end_datetime: 토요일 10:25:00 (YYYY-MM-DD HH:MM:SS)
         """
         # 토요일이 속한 월
         month = saturday.month
@@ -84,7 +86,13 @@ class TestWeekCreator:
         # end_date: 당주 수요일 (토요일 - 3일)
         end_date = (saturday - timedelta(days=3)).strftime("%Y-%m-%d")
 
-        return name, start_date, end_date
+        # test_start_datetime: 토요일 10:10:00
+        test_start_datetime = saturday.replace(hour=10, minute=10, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+        # test_end_datetime: 토요일 10:25:00
+        test_end_datetime = saturday.replace(hour=10, minute=25, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+
+        return name, start_date, end_date, test_start_datetime, test_end_datetime
 
     def create_week_info(self, base_date: Optional[datetime] = None) -> Optional[dict]:
         """
@@ -104,11 +112,13 @@ class TestWeekCreator:
             logger.info(f"이번주 토요일: {saturday_str}")
 
             # 주차 정보 계산
-            name, start_date, end_date = self.calculate_week_info(saturday)
+            name, start_date, end_date, test_start_datetime, test_end_datetime = self.calculate_week_info(saturday)
 
             logger.info(f"주차 정보: {name}")
             logger.info(f"  - 시작일 (전주 목요일): {start_date}")
             logger.info(f"  - 종료일 (당주 수요일): {end_date}")
+            logger.info(f"  - 시험 시작: {test_start_datetime}")
+            logger.info(f"  - 시험 종료: {test_end_datetime}")
 
             # 중복 체크
             with self.db_manager.get_connection() as conn:
@@ -126,10 +136,10 @@ class TestWeekCreator:
 
                     # INSERT
                     insert_query = """
-                    INSERT INTO test_week_info (name, start_date, end_date)
-                    VALUES (%s, %s, %s)
+                    INSERT INTO test_week_info (name, start_date, end_date, test_start_datetime, test_end_datetime)
+                    VALUES (%s, %s, %s, %s, %s)
                     """
-                    cursor.execute(insert_query, (name, start_date, end_date))
+                    cursor.execute(insert_query, (name, start_date, end_date, test_start_datetime, test_end_datetime))
                     conn.commit()
 
                     # 생성된 ID 조회
@@ -142,6 +152,8 @@ class TestWeekCreator:
                         "name": name,
                         "start_date": start_date,
                         "end_date": end_date,
+                        "test_start_datetime": test_start_datetime,
+                        "test_end_datetime": test_end_datetime,
                         "saturday": saturday_str
                     }
 

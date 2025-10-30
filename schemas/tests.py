@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 # 시험 시작 요청
@@ -75,3 +75,19 @@ class TestSubmitResponse(BaseModel):
     correct_count: int
     incorrect_count: int
     results: list[AnswerResultItem]
+
+# 시험 가능 여부 확인 응답 - 시험 주차 정보
+class TestAvailabilityWeekInfo(BaseModel):
+    twi_id: int
+    name: str
+    start_date: date
+    end_date: date
+    test_start_datetime: datetime
+    test_end_datetime: datetime
+
+# 시험 가능 여부 확인 응답
+class TestAvailabilityResponse(BaseModel):
+    is_available: bool
+    test_week: Optional[TestAvailabilityWeekInfo] = None
+    remaining_minutes: Optional[int] = None
+    next_test_datetime: Optional[datetime] = None

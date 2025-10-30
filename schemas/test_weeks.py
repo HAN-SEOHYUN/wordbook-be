@@ -7,6 +7,8 @@ class TestWeekResponse(BaseModel):
     name: str
     start_date: date
     end_date: date
+    test_start_datetime: datetime
+    test_end_datetime: datetime
     word_count: int
     created_at: datetime
     updated_at: datetime
@@ -35,4 +37,6 @@ class TestWeekWordsResponse(BaseModel):
     week_name: str
     start_date: date
     end_date: date
+    test_start_datetime: datetime
+    test_end_datetime: datetime
     words: list[TestWeekWordResponse]

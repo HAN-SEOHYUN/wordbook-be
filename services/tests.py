@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from datetime import datetime
 from core.database import DatabaseManager
 from schemas.tests import (
     TestStartRequest,
@@ -6,8 +7,11 @@ from schemas.tests import (
     TestSubmitRequest,
     TestSubmitResponse,
     AnswerResultItem,
+    TestAvailabilityResponse,
+    TestAvailabilityWeekInfo,
 )
 from crud import tests as crud_tests
+from crud import test_weeks as crud_test_weeks
 
 
 class TestService:
@@ -131,4 +135,62 @@ class TestService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to submit test: {e}",
+            )
+
+    def get_current_availability(self) -> TestAvailabilityResponse:
+        """현재 시험 가능 여부 확인"""
+        try:
+            with self.db.get_connection() as conn:
+                # 현재 시간
+                now = datetime.now()
+
+                # 가장 최근 주차 정보 조회
+                weeks = crud_test_weeks.get_all_test_weeks(conn, limit=1, order="desc")
+
+                if not weeks:
+                    # 주차 정보가 없으면 시험 불가
+                    return TestAvailabilityResponse(
+                        is_available=False,
+                        next_test_datetime=None
+                    )
+
+                week = weeks[0]
+                test_start = week['test_start_datetime']
+                test_end = week['test_end_datetime']
+
+                # 현재 시간이 시험 시간 범위 내인지 확인
+                if test_start <= now <= test_end:
+                    # 시험 가능
+                    remaining_seconds = (test_end - now).total_seconds()
+                    remaining_minutes = int(remaining_seconds / 60)
+
+                    return TestAvailabilityResponse(
+                        is_available=True,
+                        test_week=TestAvailabilityWeekInfo(
+                            twi_id=week['twi_id'],
+                            name=week['name'],
+                            start_date=week['start_date'],
+                            end_date=week['end_date'],
+                            test_start_datetime=test_start,
+                            test_end_datetime=test_end
+                        ),
+                        remaining_minutes=remaining_minutes,
+                        next_test_datetime=None
+                    )
+                else:
+                    # 시험 불가
+                    # 다음 시험 시간 계산 (현재 주차의 시험 시간 또는 다음 주차)
+                    next_test = test_start if now < test_start else None
+
+                    return TestAvailabilityResponse(
+                        is_available=False,
+                        test_week=None,
+                        remaining_minutes=None,
+                        next_test_datetime=next_test
+                    )
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to check test availability: {e}",
             )

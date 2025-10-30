@@ -6,6 +6,7 @@ from schemas.tests import (
     TestStartResponse,
     TestSubmitRequest,
     TestSubmitResponse,
+    TestAvailabilityResponse,
 )
 
 router = APIRouter(
@@ -56,3 +57,18 @@ def submit_test(
     답안을 제출하고 자동 채점 결과를 받습니다.
     """
     return service.submit_test(tr_id, request)
+
+
+@router.get(
+    "/current-availability",
+    response_model=TestAvailabilityResponse,
+    summary="Check Current Test Availability",
+)
+def get_current_availability(
+    service: TestService = Depends(get_test_service),
+):
+    """
+    현재 시험 가능 여부를 확인합니다.
+    시험 시간(토요일 10:10~10:25) 내라면 is_available=True를 반환합니다.
+    """
+    return service.get_current_availability()

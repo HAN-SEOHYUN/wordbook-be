@@ -48,5 +48,7 @@ class TestWeekService:
                 week_name=week_info['name'],
                 start_date=week_info['start_date'],
                 end_date=week_info['end_date'],
+                test_start_datetime=week_info['test_start_datetime'],
+                test_end_datetime=week_info['test_end_datetime'],
                 words=words,
             )

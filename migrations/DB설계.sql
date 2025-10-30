@@ -34,12 +34,15 @@
     `name` VARCHAR(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '주차명 (예: 2025-10-2주차)',
     `start_date` DATE NOT NULL COMMENT '주차 시작일',
     `end_date` DATE NOT NULL COMMENT '주차 종료일',
+    `test_start_datetime` DATETIME NOT NULL COMMENT '시험 시작 시간 (토요일 10:10)',
+    `test_end_datetime` DATETIME NOT NULL COMMENT '시험 종료 시간 (토요일 10:25)',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일시',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일시',
     PRIMARY KEY (`twi_id`),
     UNIQUE KEY `uk_test_week_info_name` (`name`),
     UNIQUE KEY `uk_test_week_info_start_date` (`start_date`),
-    KEY `idx_test_week_info_dates` (`start_date`, `end_date`)
+    KEY `idx_test_week_info_dates` (`start_date`, `end_date`),
+    KEY `idx_test_week_info_test_datetime` (`test_start_datetime`, `test_end_datetime`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='시험 주차 정의 테이블';
 
   -- ============================================================

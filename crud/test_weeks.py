@@ -18,12 +18,14 @@ def get_all_test_weeks(
         twi.name,
         twi.start_date,
         twi.end_date,
+        twi.test_start_datetime,
+        twi.test_end_datetime,
         COUNT(tw.tw_id) as word_count,
         twi.created_at,
         twi.updated_at
     FROM {TABLE_NAME} twi
     LEFT JOIN {TEST_WORDS_TABLE} tw ON twi.twi_id = tw.twi_id
-    GROUP BY twi.twi_id, twi.name, twi.start_date, twi.end_date, twi.created_at, twi.updated_at
+    GROUP BY twi.twi_id, twi.name, twi.start_date, twi.end_date, twi.test_start_datetime, twi.test_end_datetime, twi.created_at, twi.updated_at
     ORDER BY twi.start_date {order_clause}
     LIMIT %s;
     """
@@ -35,7 +37,7 @@ def get_all_test_weeks(
 def get_test_week_by_id(conn: Connection, twi_id: int) -> Optional[Dict[str, Any]]:
     """특정 시험 주차 정보를 조회합니다."""
     sql = f"""
-    SELECT twi_id, name, start_date, end_date, created_at, updated_at
+    SELECT twi_id, name, start_date, end_date, test_start_datetime, test_end_datetime, created_at, updated_at
     FROM {TABLE_NAME}
     WHERE twi_id = %s;
     """
