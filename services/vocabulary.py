@@ -24,7 +24,7 @@ class VocabularyService:
                         detail="Failed to create or update vocabulary item.",
                     )
 
-                return VocabularyResponse.model_validate(db_word)
+                return VocabularyResponse.from_db_dict(db_word)
         except Exception as e:
             # DB 연결/쿼리 오류 발생 시 500 에러로 변환
             raise HTTPException(
@@ -61,7 +61,7 @@ class VocabularyService:
         with self.db.get_connection() as conn:
             # 단어 목록 조회
             db_words = crud_voca.get_words(conn, limit, offset, target_date)
-            words = [VocabularyResponse.model_validate(word) for word in db_words]
+            words = [VocabularyResponse.from_db_dict(word) for word in db_words]
 
             # 대표 source_url 조회 (null이 아닌 값 중 하나)
             source_url = crud_voca.get_representative_source_url(conn, target_date)
@@ -86,7 +86,7 @@ class VocabularyService:
                         status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"Vocabulary item with ID {word_id} not found for update.",
                     )
-                return VocabularyResponse.model_validate(db_word)
+                return VocabularyResponse.from_db_dict(db_word)
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

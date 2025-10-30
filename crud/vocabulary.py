@@ -3,7 +3,7 @@ from pymysql.connections import Connection
 from schemas.vocabulary import VocabularyCreate, VocabularyUpdate
 from datetime import date
 
-TABLE_NAME = "daily_vocabulary"
+TABLE_NAME = "word_book"
 
 
 def create_or_update_word(
@@ -14,10 +14,10 @@ def create_or_update_word(
     - (date, english_word)가 고유 키로 중복되면 korean_meaning, source_url 및 updated_at을 업데이트합니다.
     """
     sql = f"""
-    INSERT INTO {TABLE_NAME} (date, english_word, korean_meaning, source_url)
+    INSERT INTO {TABLE_NAME} (date, word_english, word_meaning, source_url)
     VALUES (%s, %s, %s, %s)
     ON DUPLICATE KEY UPDATE
-        korean_meaning = VALUES(korean_meaning),
+        word_meaning = VALUES(word_meaning),
         source_url = VALUES(source_url),
         updated_at = CURRENT_TIMESTAMP;
     """
@@ -32,9 +32,9 @@ def create_or_update_word(
             # UPSERT 후에는 UNIQUE KEY를 사용하여 데이터를 다시 조회합니다.
 
             select_sql = f"""
-            SELECT id, date, english_word, korean_meaning, source_url, created_at, updated_at
+            SELECT wb_id, date, word_english, word_meaning, source_url, created_at, updated_at
             FROM {TABLE_NAME}
-            WHERE date = %s AND english_word = %s
+            WHERE date = %s AND word_english = %s
             """
             cursor.execute(select_sql, (word.date, word.english_word))
             return cursor.fetchone()
@@ -47,9 +47,9 @@ def create_or_update_word(
 def get_word_by_id(conn: Connection, word_id: int) -> Optional[Dict[str, Any]]:
     """ID를 사용하여 단어 정보를 조회합니다."""
     sql = f"""
-    SELECT id, date, english_word, korean_meaning, source_url, created_at, updated_at
+    SELECT wb_id, date, word_english, word_meaning, source_url, created_at, updated_at
     FROM {TABLE_NAME}
-    WHERE id = %s;
+    WHERE wb_id = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (word_id,))
@@ -66,7 +66,7 @@ def get_words(
     단어 목록을 조회합니다. 날짜 필터링 및 페이징을 지원합니다.
     """
     sql = f"""
-    SELECT id, date, english_word, korean_meaning, source_url, created_at, updated_at
+    SELECT wb_id, date, word_english, word_meaning, source_url, created_at, updated_at
     FROM {TABLE_NAME}
     """
     params: List[Any] = []
@@ -80,7 +80,7 @@ def get_words(
     if where_clause:
         sql += " WHERE " + " AND ".join(where_clause)
 
-    sql += " ORDER BY date DESC, id ASC LIMIT %s OFFSET %s;"
+    sql += " ORDER BY date DESC, wb_id ASC LIMIT %s OFFSET %s;"
     params.extend([limit, offset])
 
     with conn.cursor() as cursor:
@@ -112,16 +112,16 @@ def update_word(
     conn: Connection, word_id: int, word_data: VocabularyUpdate
 ) -> Optional[Dict[str, Any]]:
     """
-    단어 ID를 기반으로 korean_meaning, english_word만 업데이트합니다.
+    단어 ID를 기반으로 word_meaning, word_english만 업데이트합니다.
     source_url은 수정하지 않고 보존됩니다.
     """
     sql = f"""
     UPDATE {TABLE_NAME}
     SET
-        english_word = %s,
-        korean_meaning = %s,
+        word_english = %s,
+        word_meaning = %s,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = %s;
+    WHERE wb_id = %s;
     """
     try:
         with conn.cursor() as cursor:
@@ -142,7 +142,7 @@ def update_word(
 
 def delete_word(conn: Connection, word_id: int) -> bool:
     """단어 ID를 기반으로 단어를 삭제합니다."""
-    sql = f"DELETE FROM {TABLE_NAME} WHERE id = %s;"
+    sql = f"DELETE FROM {TABLE_NAME} WHERE wb_id = %s;"
     try:
         with conn.cursor() as cursor:
             cursor.execute(sql, (word_id,))

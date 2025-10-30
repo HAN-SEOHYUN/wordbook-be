@@ -39,7 +39,7 @@ class VocabularyUpdate(BaseModel):
 
 # 3. 응답 모델 (Read/Create/Update 응답)
 class VocabularyResponse(VocabularyBase):
-    id: int
+    wb_id: int
     date: date  # DB에서 DATE 타입으로 받기 때문에 date 객체로 변환
     created_at: datetime
     updated_at: datetime
@@ -47,6 +47,22 @@ class VocabularyResponse(VocabularyBase):
     # ORM 모드 활성화 (DB 딕셔너리 결과와 매핑)
     class Config:
         from_attributes = True
+        # DB 컬럼명과 모델 필드명 매핑
+        populate_by_name = True
+
+    # DB 컬럼명(wb_id, word_english, word_meaning)과 모델 필드명(id, english_word, korean_meaning) 매핑을 위한 커스텀 생성자
+    @classmethod
+    def from_db_dict(cls, db_dict: dict):
+        """데이터베이스 딕셔너리를 VocabularyResponse 객체로 변환"""
+        return cls(
+            wb_id=db_dict.get('wb_id'),
+            english_word=db_dict.get('word_english'),
+            korean_meaning=db_dict.get('word_meaning'),
+            source_url=db_dict.get('source_url'),
+            date=db_dict.get('date'),
+            created_at=db_dict.get('created_at'),
+            updated_at=db_dict.get('updated_at')
+        )
 
 
 # 4. 날짜별 단어 목록 응답 모델 (날짜 + source_url + 단어 목록)

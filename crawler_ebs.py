@@ -304,10 +304,10 @@ class EBSMorningCrawler:
         db_manager = DatabaseManager()
 
         upsert_query = """
-        INSERT INTO daily_vocabulary (date, english_word, korean_meaning, source_url)
+        INSERT INTO word_book (date, word_english, word_meaning, source_url)
         VALUES (%s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            korean_meaning = VALUES(korean_meaning),
+            word_meaning = VALUES(word_meaning),
             source_url = VALUES(source_url),
             updated_at = CURRENT_TIMESTAMP;
         """
