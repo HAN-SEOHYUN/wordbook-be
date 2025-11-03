@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 
 # 시험 시작 요청
 class TestStartRequest(BaseModel):
@@ -91,3 +91,63 @@ class TestAvailabilityResponse(BaseModel):
     test_week: Optional[TestAvailabilityWeekInfo] = None
     remaining_minutes: Optional[int] = None
     next_test_datetime: Optional[datetime] = None
+
+
+# ============================================================
+# 시험 기록 관련 스키마
+# ============================================================
+
+# 시험 기록 항목
+class TestHistoryItem(BaseModel):
+    tr_id: int
+    u_id: int
+    twi_id: int
+    test_score: int
+    created_at: datetime
+    updated_at: datetime
+    week_name: str
+    start_date: date
+    end_date: date
+    test_date: date
+    total_questions: int
+    correct_count: int
+
+    class Config:
+        from_attributes = True
+
+
+# 시험 기록 히스토리 응답
+class TestHistoryResponse(BaseModel):
+    user_id: int
+    username: str
+    test_history: List[TestHistoryItem]
+
+
+# 시험 상세 답안 항목
+class TestAnswerDetail(BaseModel):
+    ta_id: int
+    tw_id: int
+    word_english: str
+    word_meaning: str
+    user_answer: str
+    is_correct: bool
+
+    class Config:
+        from_attributes = True
+
+
+# 시험 상세 결과 응답
+class TestDetailResponse(BaseModel):
+    tr_id: int
+    u_id: int
+    username: str
+    twi_id: int
+    week_name: str
+    test_score: int
+    test_date: datetime
+    total_questions: int
+    correct_count: int
+    answers: List[TestAnswerDetail]
+
+    class Config:
+        from_attributes = True

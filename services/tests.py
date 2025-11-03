@@ -9,9 +9,14 @@ from schemas.tests import (
     AnswerResultItem,
     TestAvailabilityResponse,
     TestAvailabilityWeekInfo,
+    TestHistoryResponse,
+    TestHistoryItem,
+    TestDetailResponse,
+    TestAnswerDetail,
 )
 from crud import tests as crud_tests
 from crud import test_weeks as crud_test_weeks
+from crud import users as crud_users
 
 
 class TestService:
@@ -193,4 +198,73 @@ class TestService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to check test availability: {e}",
+            )
+
+    def get_test_history(self, u_id: int) -> TestHistoryResponse:
+        """사용자의 시험 기록 히스토리 조회"""
+        try:
+            with self.db.get_connection() as conn:
+                # 사용자 정보 조회
+                user = crud_users.get_user_by_id(conn, u_id)
+                if not user:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"User with ID {u_id} not found",
+                    )
+
+                # 시험 기록 조회
+                history = crud_tests.get_test_history(conn, u_id)
+
+                # Pydantic 모델로 변환
+                history_items = [TestHistoryItem(**item) for item in history]
+
+                return TestHistoryResponse(
+                    user_id=u_id,
+                    username=user['username'],
+                    test_history=history_items
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get test history: {e}",
+            )
+
+    def get_test_detail(self, tr_id: int) -> TestDetailResponse:
+        """특정 시험의 상세 결과 조회"""
+        try:
+            with self.db.get_connection() as conn:
+                # 시험 상세 정보 조회
+                detail = crud_tests.get_test_detail(conn, tr_id)
+
+                if not detail:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Test result with ID {tr_id} not found",
+                    )
+
+                # 답안 목록을 Pydantic 모델로 변환
+                answer_details = [TestAnswerDetail(**answer) for answer in detail['answers']]
+
+                return TestDetailResponse(
+                    tr_id=detail['tr_id'],
+                    u_id=detail['u_id'],
+                    username=detail['username'],
+                    twi_id=detail['twi_id'],
+                    week_name=detail['week_name'],
+                    test_score=detail['test_score'],
+                    test_date=detail['test_date'],
+                    total_questions=detail['total_questions'],
+                    correct_count=detail['correct_count'],
+                    answers=answer_details
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get test detail: {e}",
             )

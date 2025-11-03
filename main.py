@@ -21,8 +21,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://192.168.0.65:3000",  # Network 주소
+        "http://172.25.80.1:3000",  # Network 주소 (3000)
+        "http://172.25.80.1:3001",  # Network 주소 (3001)
     ],
     allow_credentials=True,
     allow_methods=["*"],

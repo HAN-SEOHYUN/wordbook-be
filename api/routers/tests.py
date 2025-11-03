@@ -7,6 +7,8 @@ from schemas.tests import (
     TestSubmitRequest,
     TestSubmitResponse,
     TestAvailabilityResponse,
+    TestHistoryResponse,
+    TestDetailResponse,
 )
 
 router = APIRouter(
@@ -72,3 +74,35 @@ def get_current_availability(
     시험 시간(토요일 10:10~10:25) 내라면 is_available=True를 반환합니다.
     """
     return service.get_current_availability()
+
+
+@router.get(
+    "/history",
+    response_model=TestHistoryResponse,
+    summary="Get Test History for a User",
+)
+def get_test_history(
+    u_id: int,
+    service: TestService = Depends(get_test_service),
+):
+    """
+    사용자의 시험 기록 히스토리를 조회합니다.
+    완료된 시험(test_score가 NULL이 아닌)만 반환됩니다.
+    """
+    return service.get_test_history(u_id)
+
+
+@router.get(
+    "/{tr_id}/detail",
+    response_model=TestDetailResponse,
+    summary="Get Detailed Test Results",
+)
+def get_test_detail(
+    tr_id: int,
+    service: TestService = Depends(get_test_service),
+):
+    """
+    특정 시험의 상세 결과를 조회합니다.
+    시험 기본 정보와 각 문항별 답안을 포함합니다.
+    """
+    return service.get_test_detail(tr_id)

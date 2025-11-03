@@ -3,10 +3,15 @@ import pymysql.cursors
 from contextlib import contextmanager
 import logging
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 # 환경 변수를 .env.dev 파일에서 로드
-load_dotenv(".env.dev")
+# be 디렉토리의 .env.dev 파일을 찾기 위해 절대 경로 사용
+_current_file = Path(__file__).resolve()  # be/core/database.py
+_be_dir = _current_file.parent.parent     # be 디렉토리
+_env_file = _be_dir / ".env.dev"
+load_dotenv(_env_file)
 
 
 class DatabaseManager:

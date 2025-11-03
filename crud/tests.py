@@ -6,6 +6,8 @@ TEST_RESULT_TABLE = "test_result"
 TEST_ANSWERS_TABLE = "test_answers"
 TEST_WORDS_TABLE = "test_words"
 WORD_BOOK_TABLE = "word_book"
+TEST_WEEK_INFO_TABLE = "test_week_info"
+USERS_TABLE = "users"
 
 
 def normalize_answer(text: str) -> str:
@@ -126,3 +128,89 @@ def update_test_score(conn: Connection, tr_id: int, score: int) -> None:
     except Exception as e:
         conn.rollback()
         raise e
+
+
+def get_test_history(conn: Connection, u_id: int) -> List[Dict[str, Any]]:
+    """사용자의 시험 기록 히스토리 조회"""
+    sql = f"""
+    SELECT
+        tr.tr_id,
+        tr.u_id,
+        tr.twi_id,
+        tr.test_score,
+        tr.created_at,
+        tr.updated_at,
+        twi.name AS week_name,
+        twi.start_date,
+        twi.end_date,
+        DATE(twi.test_start_datetime) AS test_date,
+        COUNT(ta.ta_id) AS total_questions,
+        SUM(ta.is_correct) AS correct_count
+    FROM {TEST_RESULT_TABLE} tr
+    JOIN {TEST_WEEK_INFO_TABLE} twi ON tr.twi_id = twi.twi_id
+    LEFT JOIN {TEST_ANSWERS_TABLE} ta ON tr.tr_id = ta.tr_id
+    WHERE tr.u_id = %s AND tr.test_score IS NOT NULL
+    GROUP BY tr.tr_id, tr.u_id, tr.twi_id, tr.test_score, tr.created_at, tr.updated_at,
+             twi.name, twi.start_date, twi.end_date, twi.test_start_datetime
+    ORDER BY tr.created_at DESC;
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(sql, (u_id,))
+        return cursor.fetchall()
+
+
+def get_test_detail(conn: Connection, tr_id: int) -> Optional[Dict[str, Any]]:
+    """특정 시험의 상세 결과 조회 (기본 정보 + 문항별 답안)"""
+    # 1. 시험 기본 정보 조회
+    basic_sql = f"""
+    SELECT
+        tr.tr_id,
+        tr.u_id,
+        u.username,
+        tr.twi_id,
+        twi.name AS week_name,
+        tr.test_score,
+        tr.created_at AS test_date,
+        COUNT(ta.ta_id) AS total_questions,
+        SUM(ta.is_correct) AS correct_count
+    FROM {TEST_RESULT_TABLE} tr
+    JOIN {USERS_TABLE} u ON tr.u_id = u.u_id
+    JOIN {TEST_WEEK_INFO_TABLE} twi ON tr.twi_id = twi.twi_id
+    LEFT JOIN {TEST_ANSWERS_TABLE} ta ON tr.tr_id = ta.tr_id
+    WHERE tr.tr_id = %s
+    GROUP BY tr.tr_id, tr.u_id, u.username, tr.twi_id, twi.name, tr.test_score, tr.created_at;
+    """
+
+    # 2. 문항별 답안 조회
+    answers_sql = f"""
+    SELECT
+        ta.ta_id,
+        ta.tw_id,
+        ta.user_answer,
+        ta.is_correct,
+        wb.word_english,
+        wb.word_meaning
+    FROM {TEST_ANSWERS_TABLE} ta
+    JOIN {TEST_WORDS_TABLE} tw ON ta.tw_id = tw.tw_id
+    JOIN {WORD_BOOK_TABLE} wb ON tw.wb_id = wb.wb_id
+    WHERE ta.tr_id = %s
+    ORDER BY ta.ta_id;
+    """
+
+    with conn.cursor() as cursor:
+        # 기본 정보 조회
+        cursor.execute(basic_sql, (tr_id,))
+        basic_info = cursor.fetchone()
+
+        if not basic_info:
+            return None
+
+        # 문항별 답안 조회
+        cursor.execute(answers_sql, (tr_id,))
+        answers = cursor.fetchall()
+
+        # 결과 조합
+        result = dict(basic_info)
+        result['answers'] = answers
+
+        return result
