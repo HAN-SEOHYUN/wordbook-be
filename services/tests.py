@@ -268,3 +268,27 @@ class TestService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to get test detail: {e}",
             )
+
+    def delete_test(self, tr_id: int) -> None:
+        """시험 기록 삭제 (재시험을 위한)"""
+        try:
+            with self.db.get_connection() as conn:
+                # 시험 기록 존재 확인
+                result = crud_tests.get_test_result_by_id(conn, tr_id)
+
+                if not result:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Test result with ID {tr_id} not found",
+                    )
+
+                # 시험 기록 삭제 (CASCADE로 test_answers도 함께 삭제됨)
+                crud_tests.delete_test_result(conn, tr_id)
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete test: {e}",
+            )

@@ -214,3 +214,30 @@ def get_test_detail(conn: Connection, tr_id: int) -> Optional[Dict[str, Any]]:
         result['answers'] = answers
 
         return result
+
+
+def get_test_result_by_id(conn: Connection, tr_id: int) -> Optional[Dict[str, Any]]:
+    """tr_id로 시험 결과 조회"""
+    sql = f"""
+    SELECT tr_id, u_id, twi_id, test_score, created_at, updated_at
+    FROM {TEST_RESULT_TABLE}
+    WHERE tr_id = %s;
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(sql, (tr_id,))
+        return cursor.fetchone()
+
+
+def delete_test_result(conn: Connection, tr_id: int) -> None:
+    """시험 결과 삭제 (CASCADE로 test_answers도 함께 삭제됨)"""
+    sql = f"""
+    DELETE FROM {TEST_RESULT_TABLE}
+    WHERE tr_id = %s;
+    """
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql, (tr_id,))
+            conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e

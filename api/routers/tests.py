@@ -106,3 +106,20 @@ def get_test_detail(
     시험 기본 정보와 각 문항별 답안을 포함합니다.
     """
     return service.get_test_detail(tr_id)
+
+
+@router.delete(
+    "/{tr_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete Test Record for Retake",
+)
+def delete_test(
+    tr_id: int,
+    service: TestService = Depends(get_test_service),
+):
+    """
+    시험 기록을 삭제합니다 (재시험을 위한).
+    CASCADE 설정에 의해 test_answers도 함께 삭제됩니다.
+    """
+    service.delete_test(tr_id)
+    return None
