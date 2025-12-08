@@ -5,20 +5,20 @@
     1. 날짜 설정 방법 (우선순위 순)
        - 우선순위 1: DAYS_AGO (상대 날짜) - 몇일 전
        - 우선순위 2: TARGET_DATE (절대 날짜) - 특정 날짜 (YYYY-MM-DD)
-    
+
     2. 예시:
        # EBS: 7일 전 크롤링
        EBS_DAYS_AGO = 7
        EBS_TARGET_DATE = None
-       
+
        # EBS: 특정 날짜 크롤링
        EBS_DAYS_AGO = None
        EBS_TARGET_DATE = "2025-12-01"
-       
+
        # BBC: 3일 전 크롤링
        BBC_DAYS_AGO = 3
        BBC_TARGET_DATE = None
-    
+
     3. python crawler_ebs.py 또는 python crawler_bbc.py 실행
 """
 
@@ -35,7 +35,7 @@ from typing import Dict, Any, Optional
 EBS_DAYS_AGO: Optional[int] = None
 
 # 우선순위 2: 특정 날짜 (YYYY-MM-DD 형식, 예: "2025-12-01")
-EBS_TARGET_DATE: Optional[str] = "2025-12-03"
+EBS_TARGET_DATE: Optional[str] = "2025-12-08"
 
 # ========== BBC Learning English ==========
 # 우선순위 1: 며칠 전 (None이면 TARGET_DATE 사용)
@@ -126,33 +126,49 @@ def validate_config() -> None:
     # EBS 날짜 검증
     if EBS_DAYS_AGO is not None:
         if EBS_DAYS_AGO < 1:
-            raise ValueError(f"EBS_DAYS_AGO는 1 이상이어야 합니다. 현재: {EBS_DAYS_AGO}")
+            raise ValueError(
+                f"EBS_DAYS_AGO는 1 이상이어야 합니다. 현재: {EBS_DAYS_AGO}"
+            )
         if EBS_DAYS_AGO > 365:
-            raise ValueError(f"EBS_DAYS_AGO는 365 이하여야 합니다. 현재: {EBS_DAYS_AGO}")
-    
+            raise ValueError(
+                f"EBS_DAYS_AGO는 365 이하여야 합니다. 현재: {EBS_DAYS_AGO}"
+            )
+
     if EBS_DAYS_AGO is None and EBS_TARGET_DATE is None:
-        raise ValueError("EBS_DAYS_AGO 또는 EBS_TARGET_DATE 중 하나는 설정되어야 합니다.")
-    
+        raise ValueError(
+            "EBS_DAYS_AGO 또는 EBS_TARGET_DATE 중 하나는 설정되어야 합니다."
+        )
+
     if EBS_TARGET_DATE is not None:
         try:
             from datetime import datetime
+
             datetime.strptime(EBS_TARGET_DATE, "%Y-%m-%d")
         except ValueError:
-            raise ValueError(f"EBS_TARGET_DATE는 YYYY-MM-DD 형식이어야 합니다. 현재: {EBS_TARGET_DATE}")
-    
+            raise ValueError(
+                f"EBS_TARGET_DATE는 YYYY-MM-DD 형식이어야 합니다. 현재: {EBS_TARGET_DATE}"
+            )
+
     # BBC 날짜 검증
     if BBC_DAYS_AGO is not None:
         if BBC_DAYS_AGO < 1:
-            raise ValueError(f"BBC_DAYS_AGO는 1 이상이어야 합니다. 현재: {BBC_DAYS_AGO}")
+            raise ValueError(
+                f"BBC_DAYS_AGO는 1 이상이어야 합니다. 현재: {BBC_DAYS_AGO}"
+            )
         if BBC_DAYS_AGO > 365:
-            raise ValueError(f"BBC_DAYS_AGO는 365 이하여야 합니다. 현재: {BBC_DAYS_AGO}")
-    
+            raise ValueError(
+                f"BBC_DAYS_AGO는 365 이하여야 합니다. 현재: {BBC_DAYS_AGO}"
+            )
+
     if BBC_TARGET_DATE is not None:
         try:
             from datetime import datetime
+
             datetime.strptime(BBC_TARGET_DATE, "%Y-%m-%d")
         except ValueError:
-            raise ValueError(f"BBC_TARGET_DATE는 YYYY-MM-DD 형식이어야 합니다. 현재: {BBC_TARGET_DATE}")
+            raise ValueError(
+                f"BBC_TARGET_DATE는 YYYY-MM-DD 형식이어야 합니다. 현재: {BBC_TARGET_DATE}"
+            )
 
     if PAGE_LOAD_TIMEOUT < 1:
         raise ValueError(f"PAGE_LOAD_TIMEOUT은 1 이상이어야 합니다.")
@@ -181,13 +197,13 @@ def print_config() -> None:
     print("=" * 60)
     print("크롤러 설정")
     print("=" * 60)
-    
+
     # EBS 날짜 설정
     if EBS_DAYS_AGO is not None:
         print(f"EBS 대상 날짜: {EBS_DAYS_AGO}일 전")
     elif EBS_TARGET_DATE is not None:
         print(f"EBS 대상 날짜: {EBS_TARGET_DATE} (특정 날짜)")
-    
+
     # BBC 날짜 설정
     if BBC_DAYS_AGO is not None:
         print(f"BBC 대상 날짜: {BBC_DAYS_AGO}일 전")
@@ -195,7 +211,7 @@ def print_config() -> None:
         print(f"BBC 대상 날짜: {BBC_TARGET_DATE} (특정 날짜)")
     else:
         print(f"BBC 대상 날짜: 자동 계산 (전주 목요일)")
-    
+
     print(f"API URL: {API_ENDPOINT}")
     print(f"Headless 모드: {HEADLESS_MODE}")
     print(f"자동 재시도: {AUTO_RETRY_PREVIOUS_DATE}")
