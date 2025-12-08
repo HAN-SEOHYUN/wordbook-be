@@ -127,7 +127,7 @@ class VocabularyService:
                 with conn.cursor() as cursor:
                     # 1. 가장 최근 주차 정보 조회
                     week_query = """
-                    SELECT start_date, end_date
+                    SELECT START_DATE, END_DATE
                     FROM test_week_info
                     ORDER BY twi_id DESC
                     LIMIT 1
