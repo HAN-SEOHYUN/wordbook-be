@@ -319,12 +319,12 @@ class EBSMorningCrawler:
         db_manager = DatabaseManager()
 
         upsert_query = """
-        INSERT INTO word_book (date, word_english, word_meaning, source_url)
+        INSERT INTO word_book (DATE, WORD_ENGLISH, WORD_MEANING, SOURCE_URL)
         VALUES (%s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE
-            word_meaning = VALUES(word_meaning),
-            source_url = VALUES(source_url),
-            updated_at = CURRENT_TIMESTAMP;
+            WORD_MEANING = VALUES(WORD_MEANING),
+            SOURCE_URL = VALUES(SOURCE_URL),
+            UPDATED_AT = CURRENT_TIMESTAMP;
         """
 
         success_count = 0
