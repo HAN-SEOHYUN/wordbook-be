@@ -139,21 +139,21 @@ class VocabularyService:
                         # 주차 정보가 없으면 빈 리스트 반환
                         return []
 
-                    start_date = str(week_info["start_date"])
-                    end_date = str(week_info["end_date"])
+                    start_date = str(week_info["START_DATE"])
+                    end_date = str(week_info["END_DATE"])
 
                     # 2. 해당 범위의 날짜 조회
                     date_query = """
-                    SELECT DISTINCT date
+                    SELECT DISTINCT DATE
                     FROM word_book
-                    WHERE date BETWEEN %s AND %s
-                    ORDER BY date DESC
+                    WHERE DATE BETWEEN %s AND %s
+                    ORDER BY DATE DESC
                     """
                     cursor.execute(date_query, (start_date, end_date))
                     rows = cursor.fetchall()
 
                     # 날짜 문자열 리스트로 변환
-                    dates = [str(row["date"]) for row in rows]
+                    dates = [str(row["DATE"]) for row in rows]
 
                     return dates
 

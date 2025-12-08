@@ -44,11 +44,11 @@ class TestWeekService:
             words = [TestWeekWordResponse(**word) for word in db_words]
 
             return TestWeekWordsResponse(
-                twi_id=week_info['twi_id'],
-                week_name=week_info['name'],
-                start_date=week_info['start_date'],
-                end_date=week_info['end_date'],
-                test_start_datetime=week_info['test_start_datetime'],
-                test_end_datetime=week_info['test_end_datetime'],
+                twi_id=week_info['TWI_ID'],
+                week_name=week_info['NAME'],
+                start_date=week_info['START_DATE'],
+                end_date=week_info['END_DATE'],
+                test_start_datetime=week_info['TEST_START_DATETIME'],
+                test_end_datetime=week_info['TEST_END_DATETIME'],
                 words=words,
             )

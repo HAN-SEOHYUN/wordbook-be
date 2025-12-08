@@ -34,18 +34,18 @@ class TestService:
 
                 if existing:
                     # 재시험: 기존 답안 삭제 및 점수 초기화
-                    crud_tests.reset_test_result(conn, existing['tr_id'])
+                    crud_tests.reset_test_result(conn, existing['TR_ID'])
 
                     return TestStartResponse(
-                        tr_id=existing['tr_id'],
-                        u_id=existing['u_id'],
-                        twi_id=existing['twi_id'],
+                        tr_id=existing['TR_ID'],
+                        u_id=existing['U_ID'],
+                        twi_id=existing['TWI_ID'],
                         test_score=None,
                         status="retry",
                         message="이전 시험 기록이 있습니다. 재시험을 시작합니다.",
-                        previous_score=existing['test_score'],
-                        created_at=existing['created_at'],
-                        updated_at=existing['updated_at'],
+                        previous_score=existing['TEST_SCORE'],
+                        created_at=existing['CREATED_AT'],
+                        updated_at=existing['UPDATED_AT'],
                     )
                 else:
                     # 신규 생성
@@ -55,14 +55,14 @@ class TestService:
                     result = crud_tests.get_existing_test_result(conn, request.u_id, request.twi_id)
 
                     return TestStartResponse(
-                        tr_id=result['tr_id'],
-                        u_id=result['u_id'],
-                        twi_id=result['twi_id'],
+                        tr_id=result['TR_ID'],
+                        u_id=result['U_ID'],
+                        twi_id=result['TWI_ID'],
                         test_score=None,
                         status="created",
                         message="새 시험이 시작되었습니다.",
-                        created_at=result['created_at'],
-                        updated_at=result['updated_at'],
+                        created_at=result['CREATED_AT'],
+                        updated_at=result['UPDATED_AT'],
                     )
         except Exception as e:
             raise HTTPException(
@@ -160,8 +160,8 @@ class TestService:
                     )
 
                 week = weeks[0]
-                test_start = week['test_start_datetime']
-                test_end = week['test_end_datetime']
+                test_start = week['TEST_START_DATETIME']
+                test_end = week['TEST_END_DATETIME']
 
                 # 현재 시간이 시험 시간 범위 내인지 확인
                 if test_start <= now <= test_end:
@@ -172,10 +172,10 @@ class TestService:
                     return TestAvailabilityResponse(
                         is_available=True,
                         test_week=TestAvailabilityWeekInfo(
-                            twi_id=week['twi_id'],
-                            name=week['name'],
-                            start_date=week['start_date'],
-                            end_date=week['end_date'],
+                            twi_id=week['TWI_ID'],
+                            name=week['NAME'],
+                            start_date=week['START_DATE'],
+                            end_date=week['END_DATE'],
                             test_start_datetime=test_start,
                             test_end_datetime=test_end
                         ),
@@ -249,12 +249,12 @@ class TestService:
                 answer_details = [TestAnswerDetail(**answer) for answer in detail['answers']]
 
                 return TestDetailResponse(
-                    tr_id=detail['tr_id'],
-                    u_id=detail['u_id'],
-                    username=detail['username'],
-                    twi_id=detail['twi_id'],
+                    tr_id=detail['TR_ID'],
+                    u_id=detail['U_ID'],
+                    username=detail['USERNAME'],
+                    twi_id=detail['TWI_ID'],
                     week_name=detail['week_name'],
-                    test_score=detail['test_score'],
+                    test_score=detail['TEST_SCORE'],
                     test_date=detail['test_date'],
                     total_questions=detail['total_questions'],
                     correct_count=detail['correct_count'],
