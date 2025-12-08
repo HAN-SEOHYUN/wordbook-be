@@ -26,37 +26,53 @@ class BBCLearningEnglishCrawler:
 
     def calculate_last_thursday(self):
         """
-        전주 목요일 날짜 계산
+        날짜 계산 함수
+        
+        우선순위:
+        1. config.BBC_DAYS_AGO가 설정되어 있으면 해당 일수 전 날짜 사용
+        2. config.BBC_TARGET_DATE가 설정되어 있으면 해당 특정 날짜 사용
+        3. 둘 다 None이면 자동으로 전주 목요일 계산 (기존 로직)
 
         Returns:
             tuple: (URL용 날짜(YYMMDD), DB용 날짜(YYYY-MM-DD))
         """
-        today = datetime.now()
-
-        # 오늘이 무슨 요일인지 확인 (0=월요일, 6=일요일)
-        days_since_thursday = (today.weekday() - 3) % 7
-
-        # 전주 목요일까지의 일수 계산
-        # 오늘이 목요일이면 7일 전, 금요일이면 8일 전, 수요일이면 6일 전
-        if days_since_thursday == 0:
-            # 오늘이 목요일인 경우 지난주 목요일
-            days_to_subtract = 7
+        # 우선순위 1: config.BBC_DAYS_AGO
+        if config.BBC_DAYS_AGO is not None:
+            target_date = datetime.now() - timedelta(days=config.BBC_DAYS_AGO)
+            logger.info(f"날짜 계산 방식: 상대 날짜 ({config.BBC_DAYS_AGO}일 전)")
+        # 우선순위 2: config.BBC_TARGET_DATE
+        elif config.BBC_TARGET_DATE is not None:
+            target_date = datetime.strptime(config.BBC_TARGET_DATE, "%Y-%m-%d")
+            logger.info(f"날짜 계산 방식: 특정 날짜 ({config.BBC_TARGET_DATE})")
+        # 우선순위 3: 자동 계산 (전주 목요일)
         else:
-            # 다른 요일인 경우 이번주 또는 지난주 목요일
-            days_to_subtract = days_since_thursday + 7 if days_since_thursday < 4 else days_since_thursday
+            today = datetime.now()
 
-        last_thursday = today - timedelta(days=days_to_subtract)
+            # 오늘이 무슨 요일인지 확인 (0=월요일, 6=일요일)
+            days_since_thursday = (today.weekday() - 3) % 7
+
+            # 전주 목요일까지의 일수 계산
+            # 오늘이 목요일이면 7일 전, 금요일이면 8일 전, 수요일이면 6일 전
+            if days_since_thursday == 0:
+                # 오늘이 목요일인 경우 지난주 목요일
+                days_to_subtract = 7
+            else:
+                # 다른 요일인 경우 이번주 또는 지난주 목요일
+                days_to_subtract = days_since_thursday + 7 if days_since_thursday < 4 else days_since_thursday
+
+            target_date = today - timedelta(days=days_to_subtract)
+            logger.info(f"날짜 계산 방식: 자동 계산 (전주 목요일)")
 
         # URL용 형식: YYMMDD (예: 251023)
-        url_format = last_thursday.strftime("%y%m%d")
+        url_format = target_date.strftime("%y%m%d")
 
         # DB용 형식: YYYY-MM-DD (예: 2025-10-23)
-        db_format = last_thursday.strftime("%Y-%m-%d")
+        db_format = target_date.strftime("%Y-%m-%d")
 
         # 표시용 형식: YYYY.MM.DD
-        display_format = last_thursday.strftime("%Y.%m.%d")
+        display_format = target_date.strftime("%Y.%m.%d")
 
-        logger.info(f"전주 목요일: {display_format}")
+        logger.info(f"대상 날짜: {display_format}")
 
         return url_format, db_format
 

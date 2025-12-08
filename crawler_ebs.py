@@ -68,17 +68,27 @@ class EBSMorningCrawler:
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.wait = WebDriverWait(self.driver, config.PAGE_LOAD_TIMEOUT)
 
-    def calculate_target_date(self, days_ago: int):
+    def calculate_target_date(self, days_ago: int = None):
         """
         날짜 계산 함수
 
         Args:
-            days_ago: 며칠 전
+            days_ago: 며칠 전 (Optional, config에서 읽어옴)
 
         Returns:
             tuple: (표시용 날짜, DB용 날짜)
         """
-        target_date = datetime.now() - timedelta(days=days_ago)
+        # 우선순위 1: config.EBS_DAYS_AGO
+        if config.EBS_DAYS_AGO is not None:
+            target_date = datetime.now() - timedelta(days=config.EBS_DAYS_AGO)
+            logger.info(f"날짜 계산 방식: 상대 날짜 ({config.EBS_DAYS_AGO}일 전)")
+        # 우선순위 2: config.EBS_TARGET_DATE
+        elif config.EBS_TARGET_DATE is not None:
+            target_date = datetime.strptime(config.EBS_TARGET_DATE, "%Y-%m-%d")
+            logger.info(f"날짜 계산 방식: 특정 날짜 ({config.EBS_TARGET_DATE})")
+        else:
+            raise ValueError("EBS_DAYS_AGO 또는 EBS_TARGET_DATE 중 하나는 설정되어야 합니다.")
+        
         display_format = target_date.strftime("%Y.%m.%d")
         db_format = target_date.strftime("%Y-%m-%d")
         return display_format, db_format
@@ -357,7 +367,7 @@ class EBSMorningCrawler:
             config.print_config()
 
             # 날짜 계산
-            display_date, db_date = self.calculate_target_date(config.EBS_DAYS_AGO)
+            display_date, db_date = self.calculate_target_date()
             logger.info(f"대상 날짜: {display_date} (DB: {db_date})")
 
             # 금요일 체크 (금요일이면 실행하지 않음)
@@ -369,8 +379,8 @@ class EBSMorningCrawler:
                 logger.info("=" * 60)
                 return
 
-            # 재시도 로직
-            if config.AUTO_RETRY_PREVIOUS_DATE:
+            # 재시도 로직 (DAYS_AGO 모드에서만 작동)
+            if config.AUTO_RETRY_PREVIOUS_DATE and config.EBS_DAYS_AGO is not None:
                 logger.info(
                     f"자동 재시도 활성화: 최대 {config.MAX_RETRY_DAYS}일 전까지 시도"
                 )
@@ -378,8 +388,14 @@ class EBSMorningCrawler:
                 for i in range(
                     config.EBS_DAYS_AGO, config.EBS_DAYS_AGO + config.MAX_RETRY_DAYS
                 ):
-                    date_range.append(self.calculate_target_date(i))
+                    # 임시로 days ago 계산
+                    temp_date = datetime.now() - timedelta(days=i)
+                    display = temp_date.strftime("%Y.%m.%d")
+                    db = temp_date.strftime("%Y-%m-%d")
+                    date_range.append((display, db))
             else:
+                if config.AUTO_RETRY_PREVIOUS_DATE and config.EBS_TARGET_DATE is not None:
+                    logger.info("특정 날짜 모드에서는 자동 재시도가 비활성화됩니다.")
                 date_range = [(display_date, db_date)]
 
             article_url = None
