@@ -20,9 +20,9 @@ def get_existing_test_result(
 ) -> Optional[Dict[str, Any]]:
     """기존 시험 결과 조회 (재시험 체크용)"""
     sql = f"""
-    SELECT tr_id, u_id, twi_id, test_score, created_at, updated_at
+    SELECT TR_ID, U_ID, TWI_ID, TEST_SCORE, CREATED_AT, UPDATED_AT
     FROM {TEST_RESULT_TABLE}
-    WHERE u_id = %s AND twi_id = %s;
+    WHERE U_ID = %s AND TWI_ID = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (u_id, twi_id))
@@ -32,7 +32,7 @@ def get_existing_test_result(
 def create_test_result(conn: Connection, u_id: int, twi_id: int) -> int:
     """새 시험 결과 레코드 생성"""
     sql = f"""
-    INSERT INTO {TEST_RESULT_TABLE} (u_id, twi_id, test_score)
+    INSERT INTO {TEST_RESULT_TABLE} (U_ID, TWI_ID, TEST_SCORE)
     VALUES (%s, %s, NULL);
     """
     try:
@@ -50,10 +50,10 @@ def reset_test_result(conn: Connection, tr_id: int) -> None:
     try:
         with conn.cursor() as cursor:
             # 기존 답안 삭제
-            cursor.execute(f"DELETE FROM {TEST_ANSWERS_TABLE} WHERE tr_id = %s;", (tr_id,))
+            cursor.execute(f"DELETE FROM {TEST_ANSWERS_TABLE} WHERE TR_ID = %s;", (tr_id,))
             # 점수 초기화
             cursor.execute(
-                f"UPDATE {TEST_RESULT_TABLE} SET test_score = NULL, updated_at = CURRENT_TIMESTAMP WHERE tr_id = %s;",
+                f"UPDATE {TEST_RESULT_TABLE} SET TEST_SCORE = NULL, UPDATED_AT = CURRENT_TIMESTAMP WHERE TR_ID = %s;",
                 (tr_id,)
             )
             conn.commit()
@@ -65,11 +65,11 @@ def reset_test_result(conn: Connection, tr_id: int) -> None:
 def get_correct_answers_for_test(conn: Connection, tr_id: int) -> Dict[int, Dict[str, str]]:
     """시험의 정답 목록 조회 (tw_id를 키로 하는 딕셔너리 반환)"""
     sql = f"""
-    SELECT tw.tw_id, wb.word_english, wb.word_meaning
+    SELECT tw.TW_ID, wb.WORD_ENGLISH, wb.WORD_MEANING
     FROM {TEST_RESULT_TABLE} tr
-    JOIN {TEST_WORDS_TABLE} tw ON tr.twi_id = tw.twi_id
-    JOIN {WORD_BOOK_TABLE} wb ON tw.wb_id = wb.wb_id
-    WHERE tr.tr_id = %s;
+    JOIN {TEST_WORDS_TABLE} tw ON tr.TWI_ID = tw.TWI_ID
+    JOIN {WORD_BOOK_TABLE} wb ON tw.WB_ID = wb.WB_ID
+    WHERE tr.TR_ID = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (tr_id,))
@@ -77,9 +77,9 @@ def get_correct_answers_for_test(conn: Connection, tr_id: int) -> Dict[int, Dict
 
         # tw_id를 키로 하는 딕셔너리로 변환
         return {
-            row['tw_id']: {
-                'word_english': row['word_english'],
-                'word_meaning': row['word_meaning']
+            row['TW_ID']: {
+                'word_english': row['WORD_ENGLISH'],
+                'word_meaning': row['WORD_MEANING']
             }
             for row in rows
         }
@@ -90,12 +90,12 @@ def save_answer(
 ) -> int:
     """답안 저장 (UPSERT)"""
     sql = f"""
-    INSERT INTO {TEST_ANSWERS_TABLE} (tr_id, tw_id, user_answer, is_correct)
+    INSERT INTO {TEST_ANSWERS_TABLE} (TR_ID, TW_ID, USER_ANSWER, IS_CORRECT)
     VALUES (%s, %s, %s, %s)
     ON DUPLICATE KEY UPDATE
-        user_answer = VALUES(user_answer),
-        is_correct = VALUES(is_correct),
-        updated_at = CURRENT_TIMESTAMP;
+        USER_ANSWER = VALUES(USER_ANSWER),
+        IS_CORRECT = VALUES(IS_CORRECT),
+        UPDATED_AT = CURRENT_TIMESTAMP;
     """
     try:
         with conn.cursor() as cursor:
@@ -104,11 +104,11 @@ def save_answer(
 
             # 저장된 ta_id 조회
             cursor.execute(
-                f"SELECT ta_id FROM {TEST_ANSWERS_TABLE} WHERE tr_id = %s AND tw_id = %s;",
+                f"SELECT TA_ID FROM {TEST_ANSWERS_TABLE} WHERE TR_ID = %s AND TW_ID = %s;",
                 (tr_id, tw_id)
             )
             result = cursor.fetchone()
-            return result['ta_id'] if result else cursor.lastrowid
+            return result['TA_ID'] if result else cursor.lastrowid
     except Exception as e:
         conn.rollback()
         raise e
@@ -118,8 +118,8 @@ def update_test_score(conn: Connection, tr_id: int, score: int) -> None:
     """시험 점수 업데이트"""
     sql = f"""
     UPDATE {TEST_RESULT_TABLE}
-    SET test_score = %s, updated_at = CURRENT_TIMESTAMP
-    WHERE tr_id = %s;
+    SET TEST_SCORE = %s, UPDATED_AT = CURRENT_TIMESTAMP
+    WHERE TR_ID = %s;
     """
     try:
         with conn.cursor() as cursor:
@@ -134,25 +134,25 @@ def get_test_history(conn: Connection, u_id: int) -> List[Dict[str, Any]]:
     """사용자의 시험 기록 히스토리 조회"""
     sql = f"""
     SELECT
-        tr.tr_id,
-        tr.u_id,
-        tr.twi_id,
-        tr.test_score,
-        tr.created_at,
-        tr.updated_at,
-        twi.name AS week_name,
-        twi.start_date,
-        twi.end_date,
-        DATE(twi.test_start_datetime) AS test_date,
-        COUNT(ta.ta_id) AS total_questions,
-        SUM(ta.is_correct) AS correct_count
+        tr.TR_ID,
+        tr.U_ID,
+        tr.TWI_ID,
+        tr.TEST_SCORE,
+        tr.CREATED_AT,
+        tr.UPDATED_AT,
+        twi.NAME AS week_name,
+        twi.START_DATE,
+        twi.END_DATE,
+        DATE(twi.TEST_START_DATETIME) AS test_date,
+        COUNT(ta.TA_ID) AS total_questions,
+        SUM(ta.IS_CORRECT) AS correct_count
     FROM {TEST_RESULT_TABLE} tr
-    JOIN {TEST_WEEK_INFO_TABLE} twi ON tr.twi_id = twi.twi_id
-    LEFT JOIN {TEST_ANSWERS_TABLE} ta ON tr.tr_id = ta.tr_id
-    WHERE tr.u_id = %s AND tr.test_score IS NOT NULL
-    GROUP BY tr.tr_id, tr.u_id, tr.twi_id, tr.test_score, tr.created_at, tr.updated_at,
-             twi.name, twi.start_date, twi.end_date, twi.test_start_datetime
-    ORDER BY tr.created_at DESC;
+    JOIN {TEST_WEEK_INFO_TABLE} twi ON tr.TWI_ID = twi.TWI_ID
+    LEFT JOIN {TEST_ANSWERS_TABLE} ta ON tr.TR_ID = ta.TR_ID
+    WHERE tr.U_ID = %s AND tr.TEST_SCORE IS NOT NULL
+    GROUP BY tr.TR_ID, tr.U_ID, tr.TWI_ID, tr.TEST_SCORE, tr.CREATED_AT, tr.UPDATED_AT,
+             twi.NAME, twi.START_DATE, twi.END_DATE, twi.TEST_START_DATETIME
+    ORDER BY tr.CREATED_AT DESC;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (u_id,))
@@ -164,37 +164,37 @@ def get_test_detail(conn: Connection, tr_id: int) -> Optional[Dict[str, Any]]:
     # 1. 시험 기본 정보 조회
     basic_sql = f"""
     SELECT
-        tr.tr_id,
-        tr.u_id,
-        u.username,
-        tr.twi_id,
-        twi.name AS week_name,
-        tr.test_score,
-        tr.created_at AS test_date,
-        COUNT(ta.ta_id) AS total_questions,
-        SUM(ta.is_correct) AS correct_count
+        tr.TR_ID,
+        tr.U_ID,
+        u.USERNAME,
+        tr.TWI_ID,
+        twi.NAME AS week_name,
+        tr.TEST_SCORE,
+        tr.CREATED_AT AS test_date,
+        COUNT(ta.TA_ID) AS total_questions,
+        SUM(ta.IS_CORRECT) AS correct_count
     FROM {TEST_RESULT_TABLE} tr
-    JOIN {USERS_TABLE} u ON tr.u_id = u.u_id
-    JOIN {TEST_WEEK_INFO_TABLE} twi ON tr.twi_id = twi.twi_id
-    LEFT JOIN {TEST_ANSWERS_TABLE} ta ON tr.tr_id = ta.tr_id
-    WHERE tr.tr_id = %s
-    GROUP BY tr.tr_id, tr.u_id, u.username, tr.twi_id, twi.name, tr.test_score, tr.created_at;
+    JOIN {USERS_TABLE} u ON tr.U_ID = u.U_ID
+    JOIN {TEST_WEEK_INFO_TABLE} twi ON tr.TWI_ID = twi.TWI_ID
+    LEFT JOIN {TEST_ANSWERS_TABLE} ta ON tr.TR_ID = ta.TR_ID
+    WHERE tr.TR_ID = %s
+    GROUP BY tr.TR_ID, tr.U_ID, u.USERNAME, tr.TWI_ID, twi.NAME, tr.TEST_SCORE, tr.CREATED_AT;
     """
 
     # 2. 문항별 답안 조회
     answers_sql = f"""
     SELECT
-        ta.ta_id,
-        ta.tw_id,
-        ta.user_answer,
-        ta.is_correct,
-        wb.word_english,
-        wb.word_meaning
+        ta.TA_ID,
+        ta.TW_ID,
+        ta.USER_ANSWER,
+        ta.IS_CORRECT,
+        wb.WORD_ENGLISH,
+        wb.WORD_MEANING
     FROM {TEST_ANSWERS_TABLE} ta
-    JOIN {TEST_WORDS_TABLE} tw ON ta.tw_id = tw.tw_id
-    JOIN {WORD_BOOK_TABLE} wb ON tw.wb_id = wb.wb_id
-    WHERE ta.tr_id = %s
-    ORDER BY ta.ta_id;
+    JOIN {TEST_WORDS_TABLE} tw ON ta.TW_ID = tw.TW_ID
+    JOIN {WORD_BOOK_TABLE} wb ON tw.WB_ID = wb.WB_ID
+    WHERE ta.TR_ID = %s
+    ORDER BY ta.TA_ID;
     """
 
     with conn.cursor() as cursor:
@@ -219,9 +219,9 @@ def get_test_detail(conn: Connection, tr_id: int) -> Optional[Dict[str, Any]]:
 def get_test_result_by_id(conn: Connection, tr_id: int) -> Optional[Dict[str, Any]]:
     """tr_id로 시험 결과 조회"""
     sql = f"""
-    SELECT tr_id, u_id, twi_id, test_score, created_at, updated_at
+    SELECT TR_ID, U_ID, TWI_ID, TEST_SCORE, CREATED_AT, UPDATED_AT
     FROM {TEST_RESULT_TABLE}
-    WHERE tr_id = %s;
+    WHERE TR_ID = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (tr_id,))
@@ -232,7 +232,7 @@ def delete_test_result(conn: Connection, tr_id: int) -> None:
     """시험 결과 삭제 (CASCADE로 test_answers도 함께 삭제됨)"""
     sql = f"""
     DELETE FROM {TEST_RESULT_TABLE}
-    WHERE tr_id = %s;
+    WHERE TR_ID = %s;
     """
     try:
         with conn.cursor() as cursor:

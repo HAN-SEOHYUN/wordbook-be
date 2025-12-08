@@ -7,9 +7,9 @@ TABLE_NAME = "users"
 def get_all_users(conn: Connection) -> List[Dict[str, Any]]:
     """모든 사용자 목록을 조회합니다."""
     sql = f"""
-    SELECT u_id, username, created_at, updated_at
+    SELECT U_ID, USERNAME, CREATED_AT, UPDATED_AT
     FROM {TABLE_NAME}
-    ORDER BY u_id ASC;
+    ORDER BY U_ID ASC;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql)
@@ -19,9 +19,9 @@ def get_all_users(conn: Connection) -> List[Dict[str, Any]]:
 def get_user_by_id(conn: Connection, u_id: int) -> Optional[Dict[str, Any]]:
     """ID로 사용자를 조회합니다."""
     sql = f"""
-    SELECT u_id, username, created_at, updated_at
+    SELECT U_ID, USERNAME, CREATED_AT, UPDATED_AT
     FROM {TABLE_NAME}
-    WHERE u_id = %s;
+    WHERE U_ID = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (u_id,))

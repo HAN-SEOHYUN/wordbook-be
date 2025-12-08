@@ -14,17 +14,20 @@ def create_or_update_word(
     - (date, english_word)가 고유 키로 중복되면 korean_meaning, source_url 및 updated_at을 업데이트합니다.
     """
     sql = f"""
-    INSERT INTO {TABLE_NAME} (date, word_english, word_meaning, source_url)
+    INSERT INTO {TABLE_NAME} (DATE, WORD_ENGLISH, WORD_MEANING, SOURCE_URL)
     VALUES (%s, %s, %s, %s)
     ON DUPLICATE KEY UPDATE
-        word_meaning = VALUES(word_meaning),
-        source_url = VALUES(source_url),
-        updated_at = CURRENT_TIMESTAMP;
+        WORD_MEANING = VALUES(WORD_MEANING),
+        SOURCE_URL = VALUES(SOURCE_URL),
+        UPDATED_AT = CURRENT_TIMESTAMP;
     """
 
     try:
         with conn.cursor() as cursor:
-            cursor.execute(sql, (word.date, word.english_word, word.korean_meaning, word.source_url))
+            cursor.execute(
+                sql,
+                (word.date, word.english_word, word.korean_meaning, word.source_url),
+            )
             conn.commit()
 
             # 마지막으로 삽입/업데이트된 행의 ID를 가져옵니다.
@@ -32,9 +35,9 @@ def create_or_update_word(
             # UPSERT 후에는 UNIQUE KEY를 사용하여 데이터를 다시 조회합니다.
 
             select_sql = f"""
-            SELECT wb_id, date, word_english, word_meaning, source_url, created_at, updated_at
+            SELECT WB_ID, DATE, WORD_ENGLISH, WORD_MEANING, SOURCE_URL, CREATED_AT, UPDATED_AT
             FROM {TABLE_NAME}
-            WHERE date = %s AND word_english = %s
+            WHERE DATE = %s AND WORD_ENGLISH = %s
             """
             cursor.execute(select_sql, (word.date, word.english_word))
             return cursor.fetchone()
@@ -47,9 +50,9 @@ def create_or_update_word(
 def get_word_by_id(conn: Connection, word_id: int) -> Optional[Dict[str, Any]]:
     """ID를 사용하여 단어 정보를 조회합니다."""
     sql = f"""
-    SELECT wb_id, date, word_english, word_meaning, source_url, created_at, updated_at
+    SELECT WB_ID, DATE, WORD_ENGLISH, WORD_MEANING, SOURCE_URL, CREATED_AT, UPDATED_AT
     FROM {TABLE_NAME}
-    WHERE wb_id = %s;
+    WHERE WB_ID = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (word_id,))
@@ -66,7 +69,7 @@ def get_words(
     단어 목록을 조회합니다. 날짜 필터링 및 페이징을 지원합니다.
     """
     sql = f"""
-    SELECT wb_id, date, word_english, word_meaning, source_url, created_at, updated_at
+    SELECT WB_ID, DATE, WORD_ENGLISH, WORD_MEANING, SOURCE_URL, CREATED_AT, UPDATED_AT
     FROM {TABLE_NAME}
     """
     params: List[Any] = []
@@ -74,13 +77,13 @@ def get_words(
 
     if target_date:
         # 날짜 포맷 검증은 Service/Router에서 수행되었다고 가정
-        where_clause.append("date = %s")
+        where_clause.append("DATE = %s")
         params.append(target_date)
 
     if where_clause:
         sql += " WHERE " + " AND ".join(where_clause)
 
-    sql += " ORDER BY date DESC, wb_id ASC LIMIT %s OFFSET %s;"
+    sql += " ORDER BY DATE DESC, WB_ID ASC LIMIT %s OFFSET %s;"
     params.extend([limit, offset])
 
     with conn.cursor() as cursor:
@@ -88,23 +91,21 @@ def get_words(
         return cursor.fetchall()
 
 
-def get_representative_source_url(
-    conn: Connection, target_date: str
-) -> Optional[str]:
+def get_representative_source_url(conn: Connection, target_date: str) -> Optional[str]:
     """
     특정 날짜의 단어들 중 source_url이 null이 아닌 값 하나를 반환합니다.
     """
     sql = f"""
-    SELECT source_url
+    SELECT SOURCE_URL
     FROM {TABLE_NAME}
-    WHERE date = %s AND source_url IS NOT NULL
+    WHERE DATE = %s AND SOURCE_URL IS NOT NULL
     LIMIT 1;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (target_date,))
         result = cursor.fetchone()
         if result:
-            return result.get('source_url')
+            return result.get("SOURCE_URL")
         return None
 
 
@@ -118,10 +119,10 @@ def update_word(
     sql = f"""
     UPDATE {TABLE_NAME}
     SET
-        word_english = %s,
-        word_meaning = %s,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE wb_id = %s;
+        WORD_ENGLISH = %s,
+        WORD_MEANING = %s,
+        UPDATED_AT = CURRENT_TIMESTAMP
+    WHERE WB_ID = %s;
     """
     try:
         with conn.cursor() as cursor:
@@ -142,7 +143,7 @@ def update_word(
 
 def delete_word(conn: Connection, word_id: int) -> bool:
     """단어 ID를 기반으로 단어를 삭제합니다."""
-    sql = f"DELETE FROM {TABLE_NAME} WHERE wb_id = %s;"
+    sql = f"DELETE FROM {TABLE_NAME} WHERE WB_ID = %s;"
     try:
         with conn.cursor() as cursor:
             cursor.execute(sql, (word_id,))
@@ -160,9 +161,9 @@ def get_distinct_dates(conn, limit: int = 5):
     cursor = conn.cursor()
 
     query = f"""
-        SELECT DISTINCT date 
+        SELECT DISTINCT DATE 
         FROM {TABLE_NAME}
-        ORDER BY date DESC 
+        ORDER BY DATE DESC 
         LIMIT %s
     """
 

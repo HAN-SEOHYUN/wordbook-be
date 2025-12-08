@@ -14,19 +14,19 @@ def get_all_test_weeks(
 
     sql = f"""
     SELECT
-        twi.twi_id,
-        twi.name,
-        twi.start_date,
-        twi.end_date,
-        twi.test_start_datetime,
-        twi.test_end_datetime,
-        COUNT(tw.tw_id) as word_count,
-        twi.created_at,
-        twi.updated_at
+        twi.TWI_ID,
+        twi.NAME,
+        twi.START_DATE,
+        twi.END_DATE,
+        twi.TEST_START_DATETIME,
+        twi.TEST_END_DATETIME,
+        COUNT(tw.TW_ID) as word_count,
+        twi.CREATED_AT,
+        twi.UPDATED_AT
     FROM {TABLE_NAME} twi
-    LEFT JOIN {TEST_WORDS_TABLE} tw ON twi.twi_id = tw.twi_id
-    GROUP BY twi.twi_id, twi.name, twi.start_date, twi.end_date, twi.test_start_datetime, twi.test_end_datetime, twi.created_at, twi.updated_at
-    ORDER BY twi.start_date {order_clause}
+    LEFT JOIN {TEST_WORDS_TABLE} tw ON twi.TWI_ID = tw.TWI_ID
+    GROUP BY twi.TWI_ID, twi.NAME, twi.START_DATE, twi.END_DATE, twi.TEST_START_DATETIME, twi.TEST_END_DATETIME, twi.CREATED_AT, twi.UPDATED_AT
+    ORDER BY twi.START_DATE {order_clause}
     LIMIT %s;
     """
     with conn.cursor() as cursor:
@@ -37,9 +37,9 @@ def get_all_test_weeks(
 def get_test_week_by_id(conn: Connection, twi_id: int) -> Optional[Dict[str, Any]]:
     """특정 시험 주차 정보를 조회합니다."""
     sql = f"""
-    SELECT twi_id, name, start_date, end_date, test_start_datetime, test_end_datetime, created_at, updated_at
+    SELECT TWI_ID, NAME, START_DATE, END_DATE, TEST_START_DATETIME, TEST_END_DATETIME, CREATED_AT, UPDATED_AT
     FROM {TABLE_NAME}
-    WHERE twi_id = %s;
+    WHERE TWI_ID = %s;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (twi_id,))
@@ -50,15 +50,15 @@ def get_test_week_words(conn: Connection, twi_id: int) -> List[Dict[str, Any]]:
     """특정 주차의 단어 목록을 조회합니다 (word_book과 JOIN)."""
     sql = f"""
     SELECT
-        tw.tw_id,
-        tw.wb_id,
-        wb.word_english,
-        wb.word_meaning,
-        wb.date
+        tw.TW_ID,
+        tw.WB_ID,
+        wb.WORD_ENGLISH,
+        wb.WORD_MEANING,
+        wb.DATE
     FROM {TEST_WORDS_TABLE} tw
-    JOIN {WORD_BOOK_TABLE} wb ON tw.wb_id = wb.wb_id
-    WHERE tw.twi_id = %s
-    ORDER BY wb.date ASC, tw.tw_id ASC;
+    JOIN {WORD_BOOK_TABLE} wb ON tw.WB_ID = wb.WB_ID
+    WHERE tw.TWI_ID = %s
+    ORDER BY wb.DATE ASC, tw.TW_ID ASC;
     """
     with conn.cursor() as cursor:
         cursor.execute(sql, (twi_id,))
