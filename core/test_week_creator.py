@@ -124,19 +124,19 @@ class TestWeekCreator:
             with self.db_manager.get_connection() as conn:
                 with conn.cursor() as cursor:
                     check_query = """
-                    SELECT twi_id, name FROM test_week_info
-                    WHERE name = %s
+                    SELECT TWI_ID, NAME FROM test_week_info
+                    WHERE NAME = %s
                     """
                     cursor.execute(check_query, (name,))
                     existing = cursor.fetchone()
 
                     if existing:
-                        logger.warning(f"이미 존재하는 주차입니다: {name} (ID: {existing[0]})")
+                        logger.warning(f"이미 존재하는 주차입니다: {name} (ID: {existing['TWI_ID']})")
                         return None
 
                     # INSERT
                     insert_query = """
-                    INSERT INTO test_week_info (name, start_date, end_date, test_start_datetime, test_end_datetime)
+                    INSERT INTO test_week_info (NAME, START_DATE, END_DATE, TEST_START_DATETIME, TEST_END_DATETIME)
                     VALUES (%s, %s, %s, %s, %s)
                     """
                     cursor.execute(insert_query, (name, start_date, end_date, test_start_datetime, test_end_datetime))

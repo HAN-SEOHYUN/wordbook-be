@@ -68,19 +68,19 @@ class TestWordsCreator:
                     wednesday = (saturday - timedelta(days=3)).strftime("%Y-%m-%d")
 
                     query = """
-                    SELECT twi_id, name, start_date, end_date
+                    SELECT TWI_ID, NAME, START_DATE, END_DATE
                     FROM test_week_info
-                    WHERE %s BETWEEN start_date AND end_date
+                    WHERE %s BETWEEN START_DATE AND END_DATE
                     """
                     cursor.execute(query, (wednesday,))
                     result = cursor.fetchone()
 
                     if result:
                         return {
-                            "twi_id": result["twi_id"],
-                            "name": result["name"],
-                            "start_date": str(result["start_date"]),
-                            "end_date": str(result["end_date"])
+                            "twi_id": result["TWI_ID"],
+                            "name": result["NAME"],
+                            "start_date": str(result["START_DATE"]),
+                            "end_date": str(result["END_DATE"])
                         }
                     else:
                         logger.warning(f"토요일 {saturday_str}에 해당하는 주차 정보가 없습니다.")
@@ -106,10 +106,10 @@ class TestWordsCreator:
             with self.db_manager.get_connection() as conn:
                 with conn.cursor() as cursor:
                     query = """
-                    SELECT wb_id, date, word_english, word_meaning
+                    SELECT WB_ID, DATE, WORD_ENGLISH, WORD_MEANING
                     FROM word_book
-                    WHERE date BETWEEN %s AND %s
-                    ORDER BY date, wb_id
+                    WHERE DATE BETWEEN %s AND %s
+                    ORDER BY DATE, WB_ID
                     """
                     cursor.execute(query, (start_date, end_date))
                     results = cursor.fetchall()
@@ -117,10 +117,10 @@ class TestWordsCreator:
                     # 날짜별로 그룹화
                     words_by_date = {}
                     for row in results:
-                        wb_id = row["wb_id"]
-                        date = row["date"]
-                        word_english = row["word_english"]
-                        word_meaning = row["word_meaning"]
+                        wb_id = row["WB_ID"]
+                        date = row["DATE"]
+                        word_english = row["WORD_ENGLISH"]
+                        word_meaning = row["WORD_MEANING"]
                         date_str = str(date)
 
                         if date_str not in words_by_date:
@@ -279,7 +279,7 @@ class TestWordsCreator:
             with self.db_manager.get_connection() as conn:
                 with conn.cursor() as cursor:
                     delete_query = """
-                    DELETE FROM test_words WHERE twi_id = %s
+                    DELETE FROM test_words WHERE TWI_ID = %s
                     """
                     cursor.execute(delete_query, (twi_id,))
                     deleted_count = cursor.rowcount
@@ -289,7 +289,7 @@ class TestWordsCreator:
 
                     # test_words에 INSERT
                     insert_query = """
-                    INSERT INTO test_words (twi_id, wb_id)
+                    INSERT INTO test_words (TWI_ID, WB_ID)
                     VALUES (%s, %s)
                     """
 
