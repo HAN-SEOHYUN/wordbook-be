@@ -125,31 +125,13 @@ class VocabularyService:
         try:
             with self.db.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    # 1. 가장 최근 주차 정보 조회
-                    week_query = """
-                    SELECT START_DATE, END_DATE
-                    FROM test_week_info
-                    ORDER BY twi_id DESC
-                    LIMIT 1
-                    """
-                    cursor.execute(week_query)
-                    week_info = cursor.fetchone()
-
-                    if not week_info:
-                        # 주차 정보가 없으면 빈 리스트 반환
-                        return []
-
-                    start_date = str(week_info["START_DATE"])
-                    end_date = str(week_info["END_DATE"])
-
-                    # 2. 해당 범위의 날짜 조회
+                    # 모든 등록된 단어의 날짜를 조회 (최신순)
                     date_query = """
                     SELECT DISTINCT DATE
                     FROM word_book
-                    WHERE DATE BETWEEN %s AND %s
                     ORDER BY DATE DESC
                     """
-                    cursor.execute(date_query, (start_date, end_date))
+                    cursor.execute(date_query)
                     rows = cursor.fetchall()
 
                     # 날짜 문자열 리스트로 변환

@@ -20,7 +20,7 @@ class TestWeekService:
         try:
             with self.db.get_connection() as conn:
                 db_weeks = crud_test_weeks.get_all_test_weeks(conn, limit, order)
-                weeks = [TestWeekResponse(**week) for week in db_weeks]
+                weeks = [TestWeekResponse.from_db_dict(week) for week in db_weeks]
                 return TestWeekListResponse(weeks=weeks)
         except Exception as e:
             raise HTTPException(
@@ -41,7 +41,7 @@ class TestWeekService:
 
             # 단어 목록 조회
             db_words = crud_test_weeks.get_test_week_words(conn, twi_id)
-            words = [TestWeekWordResponse(**word) for word in db_words]
+            words = [TestWeekWordResponse.from_db_dict(word) for word in db_words]
 
             return TestWeekWordsResponse(
                 twi_id=week_info['TWI_ID'],

@@ -20,12 +20,15 @@ def get_all_test_weeks(
         twi.END_DATE,
         twi.TEST_START_DATETIME,
         twi.TEST_END_DATETIME,
-        COUNT(tw.TW_ID) as word_count,
+        (
+            SELECT COUNT(*)
+            FROM {WORD_BOOK_TABLE} wb
+            WHERE wb.DATE BETWEEN twi.START_DATE AND twi.END_DATE
+        ) as word_count,
         twi.CREATED_AT,
         twi.UPDATED_AT
     FROM {TABLE_NAME} twi
-    LEFT JOIN {TEST_WORDS_TABLE} tw ON twi.TWI_ID = tw.TWI_ID
-    GROUP BY twi.TWI_ID, twi.NAME, twi.START_DATE, twi.END_DATE, twi.TEST_START_DATETIME, twi.TEST_END_DATETIME, twi.CREATED_AT, twi.UPDATED_AT
+    HAVING word_count > 0
     ORDER BY twi.START_DATE {order_clause}
     LIMIT %s;
     """
