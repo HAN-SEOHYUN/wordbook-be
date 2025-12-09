@@ -27,6 +27,7 @@ app.add_middleware(
         "http://192.168.0.65:3000",  # Network 주소
         "http://172.25.80.1:3000",  # Network 주소 (3000)
         "http://172.25.80.1:3001",  # Network 주소 (3001)
+        "http://rosasian.duckdns.org:3000", # Server URL
     ],
     allow_credentials=True,
     allow_methods=["*"],
