@@ -32,7 +32,7 @@ from typing import Dict, Any, Optional
 
 # 실행 환경 설정 (local, dev, prod)
 # 이 값에 따라 .env.local, .env.dev, .env.prod 파일을 로드합니다.
-ENV_ENVIRONMENT: str = "local"
+ENV_ENVIRONMENT: str = "dev"
 
 
 # ============================================================
@@ -206,7 +206,7 @@ def print_config() -> None:
     print("=" * 60)
     print("크롤러 설정")
     print("=" * 60)
-    
+
     # 환경 설정 출력
     print(f"실행 환경 (ENV_ENVIRONMENT): {ENV_ENVIRONMENT}")
 
