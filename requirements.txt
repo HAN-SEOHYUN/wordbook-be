@@ -1,12 +1,13 @@
- fastapi
-  uvicorn[standard]
-  pydantic[standard]
-  pymysql
-  python-dotenv
-  selenium==4.15.2
-  webdriver-manager==4.0.1
-  beautifulsoup4
-  lxml
-  requests
-  edge-tts>=6.1.0
-  schedule>=1.2.0
+fastapi
+uvicorn[standard]
+pydantic[standard]
+pymysql
+python-dotenv
+selenium==4.15.2
+webdriver-manager==4.0.1
+beautifulsoup4
+lxml
+requests
+edge-tts>=6.1.0
+schedule>=1.2.0
+cryptography
