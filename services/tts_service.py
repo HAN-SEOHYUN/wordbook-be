@@ -17,7 +17,7 @@ class TTSService:
     VOICE = "en-US-AriaNeural"
 
     # 오디오 파일 저장 디렉토리
-    AUDIO_DIR = Path("static/audio")
+    AUDIO_DIR = Path(__file__).parent.parent / "static" / "audio"
 
     # 텍스트 최대 길이 제한
     MAX_TEXT_LENGTH = 500

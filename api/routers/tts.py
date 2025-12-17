@@ -69,6 +69,7 @@ async def speak(
 
     except Exception as e:
         # TTS 생성 실패
+        print(f"[TTS Error] Failed to generate speech: {str(e)}")  # Error Logging
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"음성 생성에 실패했습니다: {str(e)}",

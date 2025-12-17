@@ -43,7 +43,8 @@ app.include_router(test_weeks_router, prefix="/api/v1")
 app.include_router(tests_router, prefix="/api/v1")
 
 # 3. Static 파일 서빙 설정 (오디오 캐시 파일 제공)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+from pathlib import Path
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 @app.get("/", tags=["Root"])
