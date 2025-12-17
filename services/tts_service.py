@@ -150,4 +150,34 @@ class TTSService:
                 file_path.unlink()
                 count += 1
 
+    def cleanup_old_files(self, days: int = 30) -> int:
+        """
+        오래된 오디오 캐시 파일을 삭제합니다.
+
+        Args:
+            days: 보관 기간 (일). 기본값 30일.
+
+        Returns:
+            삭제된 파일 수
+        """
+        import time
+        from datetime import datetime, timedelta
+
+        count = 0
+        now = time.time()
+        # days를 초 단위로 변환
+        cutoff = now - (days * 86400)
+
+        try:
+            for file_path in self.AUDIO_DIR.glob("*.mp3"):
+                if file_path.is_file():
+                    # 파일의 마지막 수정 시간 확인
+                    mtime = file_path.stat().st_mtime
+                    if mtime < cutoff:
+                        file_path.unlink()
+                        count += 1
+                        print(f"[TTS Cleanup] Deleted old file: {file_path.name}")
+        except Exception as e:
+            print(f"[TTS Cleanup] Error during cleanup: {str(e)}")
+
         return count

@@ -297,6 +297,8 @@ class BBCLearningEnglishCrawler:
             logger.info("✅ 크롤러 실행 완료!")
             logger.info("=" * 60)
 
+            return words
+
         except Exception as e:
             logger.error(f"크롤러 실행 중 에러: {e}", exc_info=True)
 

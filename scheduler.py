@@ -10,7 +10,7 @@
 - 금요일 00:00: test_words 생성 (내일 토요일 시험 단어 30개)
 """
 
-import schedule
+import asyncio
 import time
 import logging
 from datetime import datetime
@@ -30,6 +30,40 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def prefetch_audio(words: list):
+    """
+    수집된 단어들의 오디오를 비동기적으로 미리 생성(캐싱)합니다.
+    """
+    if not words:
+        return
+
+    logger.info(f"🔊 오디오 프리패칭 시작 (대상 단어: {len(words)}개)")
+    
+    async def _generate_all():
+        from services.tts_service import TTSService
+        tts_service = TTSService()
+        success_count = 0
+        
+        for word in words:
+            try:
+                english_text = word.get("english_word", "")
+                if english_text:
+                    await tts_service.generate_speech(english_text)
+                    success_count += 1
+            except Exception as e:
+                logger.warning(f"  ⚠️ 오디오 생성 실패 ({english_text}): {e}")
+        
+        return success_count
+
+    try:
+        # 비동기 함수 실행
+        count = asyncio.run(_generate_all())
+        logger.info(f"✓ 오디오 프리패칭 완료: {count}/{len(words)}개 생성됨")
+    except Exception as e:
+        logger.error(f"오디오 프리패칭 중 에러: {e}")
+
+
+
 def run_ebs_crawler():
     """EBS 모닝스페셜 크롤러 실행 (화, 수, 목만)"""
     today = datetime.now()
@@ -43,7 +77,9 @@ def run_ebs_crawler():
 
         try:
             crawler = EBSMorningCrawler()
-            crawler.run()
+            words = crawler.run()
+            if words:
+                prefetch_audio(words)
         except Exception as e:
             logger.error(f"EBS 크롤러 실행 중 에러: {e}", exc_info=True)
     else:
@@ -66,8 +102,11 @@ def run_bbc_crawler():
 
         try:
             crawler = BBCLearningEnglishCrawler()
-            crawler.run()
+            words = crawler.run()
             crawler.close()
+            
+            if words:
+                prefetch_audio(words)
         except Exception as e:
             logger.error(f"BBC 크롤러 실행 중 에러: {e}", exc_info=True)
     else:
@@ -135,6 +174,21 @@ def run_create_test_words():
         )
 
 
+def run_audio_cleanup_job():
+    """오디오 캐시 정리 (매일)"""
+    logger.info("=" * 80)
+    logger.info(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 오디오 캐시 정리 스케줄 실행")
+    logger.info("=" * 80)
+
+    try:
+        from services.tts_service import TTSService
+        tts_service = TTSService()
+        count = tts_service.cleanup_old_files(days=30)
+        logger.info(f"✓ 오디오 캐시 정리 완료: 총 {count}개 파일 삭제됨")
+    except Exception as e:
+        logger.error(f"오디오 캐시 정리 중 에러: {e}", exc_info=True)
+
+
 def setup_schedule():
     """스케줄 설정"""
 
@@ -155,6 +209,10 @@ def setup_schedule():
     # 시험 단어 생성: 매일 00:00 (함수 내부에서 금요일 체크)
     schedule.every().day.at("00:00").do(run_create_test_words)
     logger.info(f"✓ 시험 단어 생성 스케줄 등록: 매일 00:00 (금요일만 실행)")
+
+    # 오디오 캐시 정리: 매일 04:00
+    schedule.every().day.at("04:00").do(run_audio_cleanup_job)
+    logger.info(f"✓ 오디오 캐시 정리 스케줄 등록: 매일 04:00 (30일 지난 파일 삭제)")
 
 
 def main():
